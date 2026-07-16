@@ -95,15 +95,15 @@ class TrackSelectionDialog(QDialog):
         
         # 標題說明
         header = QLabel("★ = 適配原神程度（越多星越適合）")
-        header.setStyleSheet("color: #A0A0B0; font-size: 11px; padding: 2px;")
+        header.setStyleSheet("color: #8f96a3; font-size: 11px; padding: 2px;")
         layout.addWidget(header)
 
         # Skyline 主旋律提取核取方塊
         self._melody_only_cb = QCheckBox("🎵 啟用 Skyline 主旋律提取（自動過濾伴奏與低音）")
         self._melody_only_cb.setChecked(melody_only)
         self._melody_only_cb.setStyleSheet(
-            "color: #D4C080; font-size: 12px; font-weight: bold; padding: 6px; "
-            "border-bottom: 1px solid #3E3E48; margin-bottom: 6px;"
+            "color: #35ed7e; font-size: 12px; font-weight: bold; padding: 6px; "
+            "border-bottom: 1px solid rgba(88,101,242,40); margin-bottom: 6px;"
         )
         self._melody_only_cb.setToolTip("開啟後，播放器將只挑選音高最高的單一聲部（主旋律），丟棄所有低音伴奏和弦，極適合轉錄琴譜！")
         layout.addWidget(self._melody_only_cb)
@@ -124,7 +124,7 @@ class TrackSelectionDialog(QDialog):
             
             label = f"{track.name} [{track.instrument}] {star_str} ({track.note_count} 音符)"
             cb = QCheckBox(label)
-            cb.setStyleSheet("color: #E8E8F0; font-size: 12px; padding: 3px;")
+            cb.setStyleSheet("color: #ffffff; font-size: 12px; padding: 3px;")
             if enabled_tracks is None:
                 # 首次載入：自動推薦適配分數 >= 60 的音軌
                 cb.setChecked(track.suitability >= 60)
@@ -171,8 +171,8 @@ class SettingsDialog(QDialog):
         # 標題
         title = QLabel("⚙ 系統設定")
         title.setStyleSheet(
-            "color: #D4C080; font-size: 14px; font-weight: bold; "
-            "font-family: 'Segoe UI', 'Microsoft YaHei UI';"
+            "color: #5865f2; font-size: 14px; font-weight: 800; "
+            "font-family: 'Inter', 'Segoe UI', 'Microsoft YaHei UI'; letter-spacing: 1px;"
         )
         layout.addWidget(title)
 
@@ -200,8 +200,8 @@ class SettingsDialog(QDialog):
         self._sensitivity_combo = QComboBox()
         self._sensitivity_combo.addItems(["高 (極淨旋律)", "中 (推薦格式)", "低 (完整細節)"])
         self._sensitivity_combo.setStyleSheet(
-            "background-color: #2E2E38; color: #E8E8F0; border: 1px solid #4E4E5A; "
-            "border-radius: 4px; padding: 2px 4px; font-size: 12px;"
+            "background-color: rgba(10,13,58,200); color: #ffffff; border: 1px solid rgba(88,101,242,40); "
+            "border-radius: 10px; padding: 3px 8px; font-size: 12px;"
         )
         
         current_sens = self._config.transcribe_sensitivity
@@ -274,7 +274,7 @@ class MainWindow(QWidget):
             | Qt.WindowStaysOnTopHint
         )
         self.setObjectName("MainWindow")
-        self.setFixedSize(420, 290)
+        self.setFixedSize(480, 420)
 
         # ── 拖曳狀態 ──
         self._drag_pos: QPoint | None = None
@@ -321,40 +321,43 @@ class MainWindow(QWidget):
     # ═══════════════════ UI 初始化 ═══════════════════
 
     def _init_ui(self) -> None:
-        """建構介面佈局。"""
+        """建構介面佈局 — 三大面板分區設計。"""
         main_layout = QVBoxLayout(self)
-        main_layout.setContentsMargins(12, 8, 12, 10)
-        main_layout.setSpacing(6)
+        main_layout.setContentsMargins(12, 8, 12, 12)
+        main_layout.setSpacing(8)
 
-        # ── 標題列 ──
+        # ════════════════════════════════════════════
+        # 標題列
+        # ════════════════════════════════════════════
         title_bar = QWidget()
         title_bar.setObjectName("TitleBar")
-        title_bar.setFixedHeight(28)
+        title_bar.setFixedHeight(30)
         title_layout = QHBoxLayout(title_bar)
-        title_layout.setContentsMargins(0, 0, 0, 0)
-        title_layout.setSpacing(4)
+        title_layout.setContentsMargins(4, 0, 0, 0)
+        title_layout.setSpacing(6)
 
         self._title_label = QLabel("🎵 原神詩琴助手")
         self._title_label.setObjectName("TitleLabel")
         title_layout.addWidget(self._title_label)
 
+        version_label = QLabel(f"v{APP_VERSION}")
+        version_label.setObjectName("VersionLabel")
+        title_layout.addWidget(version_label)
+
         title_layout.addStretch()
 
-        # 設定按鈕
         settings_btn = QPushButton("⚙")
         settings_btn.setObjectName("WinBtn")
         settings_btn.setToolTip("快捷鍵設定")
         settings_btn.clicked.connect(self._open_settings)
         title_layout.addWidget(settings_btn)
 
-        # 最小化按鈕
         min_btn = QPushButton("─")
         min_btn.setObjectName("WinBtn")
         min_btn.setToolTip("最小化")
         min_btn.clicked.connect(self.showMinimized)
         title_layout.addWidget(min_btn)
 
-        # 關閉按鈕
         close_btn = QPushButton("✕")
         close_btn.setObjectName("CloseBtn")
         close_btn.setToolTip("關閉")
@@ -363,11 +366,23 @@ class MainWindow(QWidget):
 
         main_layout.addWidget(title_bar)
 
-        # ── 曲目資訊區 ──
-        info_layout = QVBoxLayout()
-        info_layout.setSpacing(6)
+        # ════════════════════════════════════════════
+        # 面板一：曲目選擇 (Track Panel)
+        # ════════════════════════════════════════════
+        track_panel = QWidget()
+        track_panel.setObjectName("TrackPanel")
+        track_panel_layout = QVBoxLayout(track_panel)
+        track_panel_layout.setContentsMargins(12, 8, 12, 10)
+        track_panel_layout.setSpacing(8)
 
+        # 面板標題
+        track_title = QLabel("📂 曲目選擇")
+        track_title.setObjectName("PanelTitle")
+        track_panel_layout.addWidget(track_title)
+
+        # 曲目下拉 + 操作按鈕
         track_row = QHBoxLayout()
+        track_row.setSpacing(6)
         self._track_combo = QComboBox()
         self._track_combo.setObjectName("TrackCombo")
         self._track_combo.setToolTip("選擇曲目")
@@ -395,100 +410,150 @@ class MainWindow(QWidget):
         self._delete_midi_btn.clicked.connect(self._delete_current_midi)
         track_row.addWidget(self._delete_midi_btn)
 
-        info_layout.addLayout(track_row)
+        track_panel_layout.addLayout(track_row)
 
-        # BPM + 狀態行 + 樂器切換
+        # 資訊列：BPM + 狀態 + 樂器
         info_row = QHBoxLayout()
-        info_row.setSpacing(8)
+        info_row.setSpacing(6)
 
         self._instrument_combo = QComboBox()
-        self._instrument_combo.addItems(["樂器: 詩琴 (短音)", "樂器: 圓號 (長音)"])
+        self._instrument_combo.addItems(["🎵 詩琴 (短音)", "📯 圓號 (長音)"])
         self._instrument_combo.currentIndexChanged.connect(self._on_instrument_changed)
         info_row.addWidget(self._instrument_combo)
 
-        self._track_btn = QPushButton("🎛️ 音軌設定")
+        self._track_btn = QPushButton("🎛️ 音軌")
         self._track_btn.setObjectName("WinBtn")
         self._track_btn.setToolTip("過濾伴奏與雜音")
         self._track_btn.clicked.connect(self._open_track_settings)
         info_row.addWidget(self._track_btn)
 
+        sep1 = QLabel("│")
+        sep1.setObjectName("InfoSep")
+        info_row.addWidget(sep1)
+
         self._bpm_label = QLabel("BPM: --")
         self._bpm_label.setObjectName("BpmLabel")
         info_row.addWidget(self._bpm_label)
+
+        sep2 = QLabel("│")
+        sep2.setObjectName("InfoSep")
+        info_row.addWidget(sep2)
 
         self._status_label = QLabel("就緒")
         self._status_label.setObjectName("StatusLabel")
         info_row.addWidget(self._status_label)
 
         info_row.addStretch()
+        track_panel_layout.addLayout(info_row)
 
-        self._note_display = QLabel("--")
-        self._note_display.setObjectName("NoteDisplay")
-        info_row.addWidget(self._note_display)
+        main_layout.addWidget(track_panel)
 
-        info_layout.addLayout(info_row)
+        # ════════════════════════════════════════════
+        # 面板二：演奏參數 (Params Panel)
+        # ════════════════════════════════════════════
+        params_panel = QWidget()
+        params_panel.setObjectName("ParamsPanel")
+        params_panel_layout = QVBoxLayout(params_panel)
+        params_panel_layout.setContentsMargins(12, 8, 12, 10)
+        params_panel_layout.setSpacing(8)
 
-        # ── 播放控制微調區 ──
-        controls_row = QHBoxLayout()
-        controls_row.setSpacing(8)
+        params_title = QLabel("🎛️ 演奏參數")
+        params_title.setObjectName("PanelTitle")
+        params_panel_layout.addWidget(params_title)
 
-        shift_label = QLabel("升降調:")
-        shift_label.setStyleSheet("color: #E8E8F0; font-size: 12px;")
-        controls_row.addWidget(shift_label)
+        # 第一列：升降調 + 速度
+        params_row1 = QHBoxLayout()
+        params_row1.setSpacing(8)
+
+        shift_label = QLabel("升降調")
+        shift_label.setObjectName("ParamLabel")
+        params_row1.addWidget(shift_label)
 
         self._pitch_spin = QSpinBox()
         self._pitch_spin.setRange(-12, 12)
         self._pitch_spin.setValue(0)
+        self._pitch_spin.setSuffix(" 半音")
         self._pitch_spin.setToolTip("手動調整音高 (半音)")
         self._pitch_spin.valueChanged.connect(self._on_settings_changed)
-        controls_row.addWidget(self._pitch_spin)
+        params_row1.addWidget(self._pitch_spin)
 
-        speed_label = QLabel("速度:")
-        speed_label.setStyleSheet("color: #E8E8F0; font-size: 12px;")
-        controls_row.addWidget(speed_label)
+        params_row1.addSpacing(12)
+
+        speed_label = QLabel("速度")
+        speed_label.setObjectName("ParamLabel")
+        params_row1.addWidget(speed_label)
 
         self._speed_spin = QDoubleSpinBox()
         self._speed_spin.setRange(0.5, 2.0)
         self._speed_spin.setSingleStep(0.1)
         self._speed_spin.setValue(1.0)
+        self._speed_spin.setSuffix("x")
         self._speed_spin.setToolTip("播放速度倍率")
         self._speed_spin.valueChanged.connect(self._on_settings_changed)
-        controls_row.addWidget(self._speed_spin)
+        params_row1.addWidget(self._speed_spin)
+
+        params_row1.addStretch()
+        params_panel_layout.addLayout(params_row1)
+
+        # 第二列：核取方塊
+        params_row2 = QHBoxLayout()
+        params_row2.setSpacing(12)
 
         self._dynamic_shift_cb = QCheckBox("智能變調")
-        self._dynamic_shift_cb.setStyleSheet("color: #E8E8F0; font-size: 12px;")
         self._dynamic_shift_cb.setToolTip("播放中自動偵測變調並平移音階")
         self._dynamic_shift_cb.stateChanged.connect(self._on_settings_changed)
-        controls_row.addWidget(self._dynamic_shift_cb)
+        params_row2.addWidget(self._dynamic_shift_cb)
 
         self._velocity_cb = QCheckBox("力度演奏")
-        self._velocity_cb.setStyleSheet("color: #E8E8F0; font-size: 12px;")
         self._velocity_cb.setToolTip("根據音符力度動態調整按壓時長")
         self._velocity_cb.setChecked(True)
         self._velocity_cb.stateChanged.connect(self._on_velocity_changed)
-        controls_row.addWidget(self._velocity_cb)
+        params_row2.addWidget(self._velocity_cb)
 
-        controls_row.addStretch()
-        info_layout.addLayout(controls_row)
+        params_row2.addStretch()
+        params_panel_layout.addLayout(params_row2)
 
-        main_layout.addLayout(info_layout)
+        main_layout.addWidget(params_panel)
 
-        # ── 進度條 ──
+        # ════════════════════════════════════════════
+        # 面板三：播放控制 (Playback Panel)
+        # ════════════════════════════════════════════
+        playback_panel = QWidget()
+        playback_panel.setObjectName("PlaybackPanel")
+        playback_panel_layout = QVBoxLayout(playback_panel)
+        playback_panel_layout.setContentsMargins(12, 8, 12, 12)
+        playback_panel_layout.setSpacing(8)
+
+        # 音符顯示 + 狀態 (橫向佈局)
+        note_row = QHBoxLayout()
+        note_row.setSpacing(12)
+
+        note_row.addStretch()
+
+        self._note_display = QLabel("--")
+        self._note_display.setObjectName("NoteDisplay")
+        note_row.addWidget(self._note_display)
+
+        note_row.addStretch()
+
+        playback_panel_layout.addLayout(note_row)
+
+        # 進度條
         self._progress_bar = QProgressBar()
         self._progress_bar.setRange(0, 100)
         self._progress_bar.setValue(0)
         self._progress_bar.setTextVisible(False)
-        main_layout.addWidget(self._progress_bar)
+        playback_panel_layout.addWidget(self._progress_bar)
 
         # 進度文字
         self._progress_label = QLabel("0 / 0")
         self._progress_label.setObjectName("ProgressLabel")
         self._progress_label.setAlignment(Qt.AlignCenter)
-        main_layout.addWidget(self._progress_label)
+        playback_panel_layout.addWidget(self._progress_label)
 
-        # ── 控制按鈕列 ──
+        # 控制按鈕列
         control_layout = QHBoxLayout()
-        control_layout.setSpacing(6)
+        control_layout.setSpacing(8)
         control_layout.setContentsMargins(0, 4, 0, 0)
 
         self._prev_btn = QPushButton("⏮")
@@ -497,7 +562,13 @@ class MainWindow(QWidget):
         self._prev_btn.clicked.connect(self._prev_track)
         control_layout.addWidget(self._prev_btn)
 
-        self._play_btn = QPushButton("▶")
+        self._stop_btn = QPushButton("⏹")
+        self._stop_btn.setObjectName("ControlBtn")
+        self._stop_btn.setToolTip("停止 (F12)")
+        self._stop_btn.clicked.connect(self._force_stop)
+        control_layout.addWidget(self._stop_btn)
+
+        self._play_btn = QPushButton("▶  播放")
         self._play_btn.setObjectName("PlayBtn")
         self._play_btn.setToolTip("播放/暫停 (F8)")
         self._play_btn.clicked.connect(self._toggle_play_pause)
@@ -509,20 +580,15 @@ class MainWindow(QWidget):
         self._next_btn.clicked.connect(self._next_track)
         control_layout.addWidget(self._next_btn)
 
-        self._stop_btn = QPushButton("⏹")
-        self._stop_btn.setObjectName("ControlBtn")
-        self._stop_btn.setToolTip("停止 (F12)")
-        self._stop_btn.clicked.connect(self._force_stop)
-        control_layout.addWidget(self._stop_btn)
-
-        # 重新整理曲目列表
         self._refresh_btn = QPushButton("🔄")
         self._refresh_btn.setObjectName("ControlBtn")
         self._refresh_btn.setToolTip("重新掃描 MIDI 資料夾")
         self._refresh_btn.clicked.connect(self._refresh_playlist)
         control_layout.addWidget(self._refresh_btn)
 
-        main_layout.addLayout(control_layout)
+        playback_panel_layout.addLayout(control_layout)
+
+        main_layout.addWidget(playback_panel)
 
     def _apply_styles(self) -> None:
         """套用 QSS 樣式表。"""
@@ -604,7 +670,7 @@ class MainWindow(QWidget):
                 f"0 / {self._current_midi.total_notes}"
             )
             self._note_display.setText("--")
-            self._play_btn.setText("▶")
+            self._play_btn.setText("▶  播放")
 
         except Exception as e:
             self._bpm_label.setText("BPM: --")
@@ -890,15 +956,15 @@ class MainWindow(QWidget):
             # 重新開始播放
             self._player.set_midi_data(self._current_midi)
             self._player.play()
-            self._play_btn.setText("⏸")
+            self._play_btn.setText("⏸  暫停")
             self._status_label.setText("播放中...")
         elif self._player.is_playing:
             self._player.pause()
-            self._play_btn.setText("▶")
+            self._play_btn.setText("▶  播放")
             self._status_label.setText("已暫停")
         else:
             self._player.toggle_play_pause()
-            self._play_btn.setText("⏸")
+            self._play_btn.setText("⏸  暫停")
             self._status_label.setText("播放中...")
 
     @pyqtSlot()
@@ -923,7 +989,7 @@ class MainWindow(QWidget):
         self._player.stop()
         if self._player.isRunning():
             self._player.wait(2000)  # 等待執行緒結束，最多 2 秒
-        self._play_btn.setText("▶")
+        self._play_btn.setText("▶  播放")
         self._status_label.setText("已停止")
         self._note_display.setText("--")
         self._progress_bar.setValue(0)
@@ -942,9 +1008,9 @@ class MainWindow(QWidget):
         self._status_label.setText(state_text.get(state, state))
 
         if state == PlaybackState.PLAYING:
-            self._play_btn.setText("⏸")
+            self._play_btn.setText("⏸  暫停")
         else:
-            self._play_btn.setText("▶")
+            self._play_btn.setText("▶  播放")
 
     @pyqtSlot(int, int)
     def _on_progress_updated(self, current: int, total: int) -> None:
@@ -962,7 +1028,7 @@ class MainWindow(QWidget):
     @pyqtSlot()
     def _on_playback_finished(self) -> None:
         """播放結束回調。"""
-        self._play_btn.setText("▶")
+        self._play_btn.setText("▶  播放")
         self._status_label.setText("播放完畢")
         self._note_display.setText("✓")
 
@@ -1030,10 +1096,10 @@ class MainWindow(QWidget):
         
         # 套用樣式
         msg_box.setStyleSheet(
-            "QMessageBox { background-color: #1E1E24; color: #E8E8F0; }"
-            "QLabel { color: #E8E8F0; font-size: 12px; }"
-            "QPushButton { background-color: #2E2E38; color: #D4C080; border: 1px solid #4E4E5A; border-radius: 4px; padding: 4px 12px; font-size: 12px; }"
-            "QPushButton:hover { background-color: #3E3E48; color: #E8E8F0; }"
+            "QMessageBox { background-color: #0a0d3a; color: #ffffff; }"
+            "QLabel { color: #ffffff; font-size: 12px; }"
+            "QPushButton { background-color: #1e2353; color: #ffffff; border: 1px solid rgba(88,101,242,40); border-radius: 12px; padding: 6px 16px; font-size: 12px; font-weight: bold; }"
+            "QPushButton:hover { background-color: #5865f2; border-color: #5865f2; }"
         )
         
         msg_box.exec_()
