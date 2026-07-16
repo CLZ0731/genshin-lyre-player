@@ -137,10 +137,23 @@ QLabel#ProgressLabel {{
 /* ═══════════════════════════════════════════════
    一般按鈕 — 膠囊圓角 (Pill Shape)
    ═══════════════════════════════════════════════ */
-QPushButton#ControlBtn {{
+QPushButton#ControlBtn, QPushButton#IconBtn {{
     background-color: {C["canvas_soft"]};
     color: {C["ink"]};
     border: none;
+}}
+
+QPushButton#ControlBtn {{
+    border-radius: 15px; /* 高度 30px 的半值，呈現完美膠囊 */
+    padding: 6px 12px;
+    font-family: "UberMoveText", "Inter", "Segoe UI", sans-serif;
+    font-size: 13px;
+    font-weight: 500;
+    min-width: 48px;
+    min-height: 30px;
+}}
+
+QPushButton#IconBtn {{
     border-radius: 16px; /* 32px 高度的一半，呈現完美圓形 */
     padding: 0;
     min-width: 32px;
@@ -149,15 +162,15 @@ QPushButton#ControlBtn {{
     max-height: 32px;
 }}
 
-QPushButton#ControlBtn:hover {{
+QPushButton#ControlBtn:hover, QPushButton#IconBtn:hover {{
     background-color: {C["border"]};
 }}
 
-QPushButton#ControlBtn:pressed {{
+QPushButton#ControlBtn:pressed, QPushButton#IconBtn:pressed {{
     background-color: {C["surface_pressed"]};
 }}
 
-QPushButton#ControlBtn:disabled {{
+QPushButton#ControlBtn:disabled, QPushButton#IconBtn:disabled {{
     background-color: {C["canvas_soft"]};
     color: {C["ink_dim"]};
 }}
