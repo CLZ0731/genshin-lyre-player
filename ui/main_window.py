@@ -96,15 +96,15 @@ class TrackSelectionDialog(QDialog):
         
         # 標題說明
         header = QLabel("★ = 適配原神程度（越多星越適合）")
-        header.setStyleSheet("color: #8f96a3; font-size: 11px; padding: 2px;")
+        header.setStyleSheet("color: #5e5e5e; font-size: 11px; padding: 2px;")
         layout.addWidget(header)
 
         # Skyline 主旋律提取核取方塊
         self._melody_only_cb = QCheckBox("啟用 Skyline 主旋律提取（自動過濾伴奏與低音）")
         self._melody_only_cb.setChecked(melody_only)
         self._melody_only_cb.setStyleSheet(
-            "color: #35ed7e; font-size: 12px; font-weight: bold; padding: 6px; "
-            "border-bottom: 1px solid rgba(88,101,242,40); margin-bottom: 6px;"
+            "color: #000000; font-size: 12px; font-weight: bold; padding: 6px; "
+            "border-bottom: 1px solid #e2e2e2; margin-bottom: 6px;"
         )
         self._melody_only_cb.setToolTip("開啟後，播放器將只挑選音高最高的單一聲部（主旋律），丟棄所有低音伴奏和弦，極適合轉錄琴譜！")
         layout.addWidget(self._melody_only_cb)
@@ -125,7 +125,7 @@ class TrackSelectionDialog(QDialog):
             
             label = f"{track.name} [{track.instrument}] {star_str} ({track.note_count} 音符)"
             cb = QCheckBox(label)
-            cb.setStyleSheet("color: #ffffff; font-size: 12px; padding: 3px;")
+            cb.setStyleSheet("color: #000000; font-size: 12px; padding: 3px;")
             if enabled_tracks is None:
                 # 首次載入：自動推薦適配分數 >= 60 的音軌
                 cb.setChecked(track.suitability >= 60)
