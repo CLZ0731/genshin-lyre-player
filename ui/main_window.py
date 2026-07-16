@@ -6,7 +6,7 @@
 
 import os
 
-from PyQt5.QtCore import Qt, QPoint, pyqtSlot
+from PyQt5.QtCore import Qt, QPoint, pyqtSlot, QThread, pyqtSignal
 from PyQt5.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel,
     QPushButton, QProgressBar, QDialog, QLineEdit,
@@ -25,6 +25,56 @@ from utils.config_manager import ConfigManager
 from utils.hotkey_manager import HotkeyManager
 from utils.online_presets import fetch_online_presets, lookup_preset, export_preset
 from ui.styles import MAIN_STYLESHEET
+
+APP_VERSION = "1.0.0"
+
+class UpdateCheckerThread(QThread):
+    """
+    背景執行緒，自動向 GitHub API 查詢最新發布的 Release 版本。
+    """
+    update_available = pyqtSignal(str, str, str)  # 訊號傳遞：(新版本號, 下載網址, 更新說明)
+
+    def __init__(self, current_version: str, parent=None):
+        super().__init__(parent)
+        self.current_version = current_version
+
+    def run(self) -> None:
+        try:
+            import urllib.request
+            import json
+            url = "https://api.github.com/repos/CLZ0731/genshin-lyre-player/releases/latest"
+            req = urllib.request.Request(
+                url, 
+                headers={
+                    "User-Agent": "GenshinLyrePlayer-Updater",
+                    "Accept": "application/vnd.github.v3+json"
+                }
+            )
+            # 設定 5 秒超時，防止無網路時阻塞
+            with urllib.request.urlopen(req, timeout=5) as response:
+                if response.status == 200:
+                    data = json.loads(response.read().decode("utf-8"))
+                    latest_version = data.get("tag_name", "").strip().lstrip("v")
+                    release_url = data.get("html_url", "")
+                    release_notes = data.get("body", "")
+                    
+                    if latest_version and self.is_newer(latest_version, self.current_version):
+                        self.update_available.emit(latest_version, release_url, release_notes)
+        except Exception as e:
+            # 靜默處理網路或 API 連線異常
+            print(f"[檢查更新] 檢查失敗或網路不可達: {e}")
+
+    def is_newer(self, latest: str, current: str) -> bool:
+        """語意化版本比較 (例如 1.0.1 > 1.0.0)"""
+        try:
+            latest_parts = [int(p) for p in latest.split(".")]
+            current_parts = [int(p) for p in current.split(".")]
+            max_len = max(len(latest_parts), len(current_parts))
+            latest_parts += [0] * (max_len - len(latest_parts))
+            current_parts += [0] * (max_len - len(current_parts))
+            return latest_parts > current_parts
+        except ValueError:
+            return latest != current
 
 
 class TrackSelectionDialog(QDialog):
@@ -256,6 +306,11 @@ class MainWindow(QWidget):
 
         # ── 註冊快捷鍵 ──
         self._hotkey_manager.register(self._config.hotkeys)
+
+        # ── 檢查更新 ──
+        self._update_checker = UpdateCheckerThread(APP_VERSION, self)
+        self._update_checker.update_available.connect(self._show_update_dialog)
+        self._update_checker.start()
 
     # ═══════════════════ UI 初始化 ═══════════════════
 
@@ -903,3 +958,32 @@ class MainWindow(QWidget):
         """視窗關閉事件。"""
         self._on_close()
         event.accept()
+
+    def _show_update_dialog(self, latest_version: str, release_url: str, release_notes: str) -> None:
+        """顯示更新提示對話框。"""
+        from PyQt5.QtWidgets import QMessageBox
+        import webbrowser
+        
+        # 建立自定義風格的對話框
+        msg_box = QMessageBox(self)
+        msg_box.setWindowTitle("🔔 發現新版本！")
+        msg_box.setText(f"<b>有新版本 {latest_version} 可用！</b><br><br>目前版本: {APP_VERSION}<br><br>更新說明:<br>{release_notes if release_notes else '無詳細說明'}")
+        msg_box.setInformativeText("是否前往下載最新安裝包？")
+        
+        # 自定義按鈕
+        yes_btn = msg_box.addButton("💾 前往下載", QMessageBox.YesRole)
+        no_btn = msg_box.addButton("下次再說", QMessageBox.NoRole)
+        msg_box.setDefaultButton(yes_btn)
+        
+        # 套用樣式
+        msg_box.setStyleSheet(
+            "QMessageBox { background-color: #1E1E24; color: #E8E8F0; }"
+            "QLabel { color: #E8E8F0; font-size: 12px; }"
+            "QPushButton { background-color: #2E2E38; color: #D4C080; border: 1px solid #4E4E5A; border-radius: 4px; padding: 4px 12px; font-size: 12px; }"
+            "QPushButton:hover { background-color: #3E3E48; color: #E8E8F0; }"
+        )
+        
+        msg_box.exec_()
+        
+        if msg_box.clickedButton() == yes_btn:
+            webbrowser.open(release_url)
