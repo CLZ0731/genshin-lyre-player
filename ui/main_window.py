@@ -197,23 +197,6 @@ class SettingsDialog(QDialog):
             self._inputs[action] = edit
             form.addRow(label_text + "：", edit)
 
-        # AI 轉錄過濾強度設定
-        self._sensitivity_combo = QComboBox()
-        self._sensitivity_combo.addItems(["高 (極淨旋律)", "中 (推薦格式)", "低 (完整細節)"])
-        self._sensitivity_combo.setStyleSheet(
-            "background-color: rgba(10,13,58,200); color: #ffffff; border: 1px solid rgba(88,101,242,40); "
-            "border-radius: 10px; padding: 3px 8px; font-size: 12px;"
-        )
-        
-        current_sens = self._config.transcribe_sensitivity
-        if current_sens == "high":
-            self._sensitivity_combo.setCurrentIndex(0)
-        elif current_sens == "low":
-            self._sensitivity_combo.setCurrentIndex(2)
-        else:
-            self._sensitivity_combo.setCurrentIndex(1)
-            
-        form.addRow("AI 轉錄過濾：", self._sensitivity_combo)
 
         layout.addLayout(form)
 
@@ -243,15 +226,7 @@ class SettingsDialog(QDialog):
         if new_hotkeys:
             self._config.hotkeys = new_hotkeys
             
-        # 儲存 AI 轉錄過濾靈敏度
-        idx = self._sensitivity_combo.currentIndex()
-        if idx == 0:
-            self._config.transcribe_sensitivity = "high"
-        elif idx == 2:
-            self._config.transcribe_sensitivity = "low"
-        else:
-            self._config.transcribe_sensitivity = "medium"
-            
+
         self.accept()
 
 
@@ -825,20 +800,9 @@ class MainWindow(QWidget):
         output_midi_name = f"{filename}_transcribed.mid"
         output_midi_path = os.path.join(self._midi_folder, output_midi_name)
 
-        # 根據設定取得 AI 轉錄靈敏度閾值
-        sens = self._config.transcribe_sensitivity
-        if sens == "high":
-            # 高強度過濾：大幅過濾噪音與背景雜音，只保留最強的主旋律
-            onset_threshold = 0.70
-            frame_threshold = 0.50
-        elif sens == "low":
-            # 低強度過濾：保留最多細節（適合極度乾淨的鋼琴獨奏）
-            onset_threshold = 0.45
-            frame_threshold = 0.25
-        else:
-            # 預設中等過濾
-            onset_threshold = 0.55
-            frame_threshold = 0.35
+        # 使用預設的中等 AI 轉錄過濾靈敏度
+        onset_threshold = 0.55
+        frame_threshold = 0.35
 
         # 鎖定 UI 避免重複操作或在播放時干擾
         self._force_stop()
