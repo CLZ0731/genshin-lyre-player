@@ -28,17 +28,10 @@ C = COLORS  # 短別名
 
 MAIN_STYLESHEET = f"""
 /* ═══════════════════════════════════════════════
-   主視窗 — 深靛藍漸層畫布
+   主視窗 — 背景由 paintEvent 自繪圓角漸層
    ═══════════════════════════════════════════════ */
 QWidget#MainWindow {{
-    background: qlineargradient(
-        x1:0, y1:0, x2:0.4, y2:1,
-        stop:0   {C["canvas"]},
-        stop:0.5 #101440,
-        stop:1   {C["canvas"]}
-    );
-    border: 1px solid {C["blurple_glow"]};
-    border-radius: 16px;
+    background: transparent;
 }}
 
 /* ═══════════════════════════════════════════════

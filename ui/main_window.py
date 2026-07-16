@@ -274,7 +274,8 @@ class MainWindow(QWidget):
             | Qt.WindowStaysOnTopHint
         )
         self.setObjectName("MainWindow")
-        self.setFixedSize(480, 420)
+        self.setAttribute(Qt.WA_TranslucentBackground)
+        self.setFixedSize(480, 540)
 
         # ── 拖曳狀態 ──
         self._drag_pos: QPoint | None = None
@@ -593,6 +594,29 @@ class MainWindow(QWidget):
     def _apply_styles(self) -> None:
         """套用 QSS 樣式表。"""
         self.setStyleSheet(MAIN_STYLESHEET)
+
+    def paintEvent(self, event) -> None:
+        """自繪圓角背景，解決 FramelessWindowHint 下 QSS border-radius 無法裁切視窗形狀的問題。"""
+        painter = QPainter(self)
+        painter.setRenderHint(QPainter.Antialiasing)
+
+        # 繪製圓角矩形背景
+        path = QPainterPath()
+        path.addRoundedRect(0.0, 0.0, float(self.width()), float(self.height()), 16.0, 16.0)
+        painter.setClipPath(path)
+
+        # 漸層背景
+        from PyQt5.QtGui import QLinearGradient
+        grad = QLinearGradient(0, 0, self.width() * 0.4, self.height())
+        grad.setColorAt(0.0, QColor(10, 13, 58))
+        grad.setColorAt(0.5, QColor(16, 20, 64))
+        grad.setColorAt(1.0, QColor(10, 13, 58))
+        painter.fillPath(path, QBrush(grad))
+
+        # 繪製邊框
+        painter.setPen(QPen(QColor(88, 101, 242, 60), 1.0))
+        painter.drawPath(path)
+        painter.end()
 
     # ═══════════════════ 信號連接 ═══════════════════
 
