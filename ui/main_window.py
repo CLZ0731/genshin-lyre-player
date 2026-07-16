@@ -33,7 +33,7 @@ class UpdateCheckerThread(QThread):
     """
     背景執行緒，自動向 GitHub API 查詢最新發布的 Release 版本。
     """
-    update_available = pyqtSignal(str, str, str)  # 訊號傳遞：(新版本號, 下載網址, 更新說明)
+    update_available = pyqtSignal(str, str, str, str)  # 訊號傳遞：(新版本號, 下載網址, 更新說明, MSI直鏈)
 
     def __init__(self, current_version: str, parent=None):
         super().__init__(parent)
@@ -71,8 +71,15 @@ class UpdateCheckerThread(QThread):
                     release_url = data.get("html_url", "")
                     release_notes = data.get("body", "")
                     
+                    # 尋找 ZIP 下載連結
+                    download_url = ""
+                    for asset in data.get("assets", []):
+                        if asset.get("name", "").endswith(".zip"):
+                            download_url = asset.get("browser_download_url", "")
+                            break
+                    
                     if latest_version and self.is_newer(latest_version, self.current_version):
-                        self.update_available.emit(latest_version, release_url, release_notes)
+                        self.update_available.emit(latest_version, release_url, release_notes, download_url)
         except Exception as e:
             # 靜默處理網路或 API 連線異常
             print(f"[檢查更新] 檢查失敗或網路不可達: {e}")
@@ -88,6 +95,141 @@ class UpdateCheckerThread(QThread):
             return latest_parts > current_parts
         except ValueError:
             return latest != current
+
+
+class UpdateDownloaderThread(QThread):
+    """背景下載更新檔的執行緒"""
+    progress = pyqtSignal(int, int)  # (已下載, 總大小)
+    finished_download = pyqtSignal(str) # 下載完成的檔案路徑
+    error = pyqtSignal(str)
+
+    def __init__(self, url: str, parent=None):
+        super().__init__(parent)
+        self.url = url
+
+    def run(self) -> None:
+        try:
+            import urllib.request
+            import tempfile
+            import os
+            import ssl
+            
+            ssl_context = ssl._create_unverified_context()
+            req = urllib.request.Request(self.url, headers={"User-Agent": "GenshinLyrePlayer-Updater"})
+            
+            with urllib.request.urlopen(req, context=ssl_context) as response:
+                total_size = int(response.info().get("Content-Length", 0))
+                
+                # 建立暫存檔
+                fd, temp_path = tempfile.mkstemp(suffix=".zip", prefix="GenshinLyrePlayer_Update_")
+                
+                with os.fdopen(fd, 'wb') as out_file:
+                    downloaded = 0
+                    chunk_size = 8192
+                    while True:
+                        chunk = response.read(chunk_size)
+                        if not chunk:
+                            break
+                        out_file.write(chunk)
+                        downloaded += len(chunk)
+                        self.progress.emit(downloaded, total_size)
+                
+                self.finished_download.emit(temp_path)
+        except Exception as e:
+            self.error.emit(str(e))
+
+
+class UpdateProgressDialog(QDialog):
+    """顯示下載進度的對話框"""
+    def __init__(self, url: str, parent=None):
+        super().__init__(parent)
+        self.setWindowTitle("下載更新中...")
+        self.setFixedSize(350, 120)
+        self.setStyleSheet(
+            "QDialog { background-color: #0a0d3a; color: #ffffff; }"
+            "QLabel { color: #ffffff; font-size: 13px; font-weight: bold; }"
+            "QProgressBar { border: 1px solid rgba(88,101,242,40); border-radius: 6px; background-color: #1e2353; text-align: center; color: white; }"
+            "QProgressBar::chunk { background-color: #5865f2; border-radius: 6px; }"
+        )
+        
+        layout = QVBoxLayout(self)
+        self.status_label = QLabel("正在連線...")
+        self.status_label.setAlignment(Qt.AlignCenter)
+        layout.addWidget(self.status_label)
+        
+        self.progress_bar = QProgressBar()
+        self.progress_bar.setRange(0, 100)
+        self.progress_bar.setValue(0)
+        layout.addWidget(self.progress_bar)
+        
+        self.downloader = UpdateDownloaderThread(url, self)
+        self.downloader.progress.connect(self._on_progress)
+        self.downloader.finished_download.connect(self._on_finished)
+        self.downloader.error.connect(self._on_error)
+        self.downloader.start()
+        
+    @pyqtSlot(int, int)
+    def _on_progress(self, downloaded: int, total: int) -> None:
+        if total > 0:
+            percent = int((downloaded / total) * 100)
+            self.progress_bar.setValue(percent)
+            mb_downloaded = downloaded / (1024 * 1024)
+            mb_total = total / (1024 * 1024)
+            self.status_label.setText(f"下載中... {mb_downloaded:.1f} MB / {mb_total:.1f} MB")
+        else:
+            self.status_label.setText(f"下載中... {downloaded / (1024 * 1024):.1f} MB")
+            
+    @pyqtSlot(str)
+    def _on_finished(self, temp_path: str) -> None:
+        self.status_label.setText("下載完成！準備安裝...")
+        import os
+        import sys
+        import tempfile
+        import zipfile
+        import subprocess
+        from PyQt5.QtWidgets import QApplication
+        
+        # 解壓縮到暫存資料夾
+        extract_dir = tempfile.mkdtemp(prefix="GenshinLyrePlayer_Update_Extract_")
+        try:
+            with zipfile.ZipFile(temp_path, 'r') as zip_ref:
+                zip_ref.extractall(extract_dir)
+        except Exception as e:
+            self._on_error(f"解壓縮失敗: {e}")
+            return
+            
+        current_app_dir = os.path.dirname(sys.executable) if getattr(sys, 'frozen', False) else os.path.dirname(os.path.abspath(__file__))
+        
+        # 產生更新用的暫存批次檔
+        bat_content = f"""@echo off
+echo 正在等待主程式關閉...
+timeout /t 3 /nobreak >nul
+echo 正在替換新版本檔案...
+xcopy /E /Y /Q "{extract_dir}\\*" "{current_app_dir}\\"
+echo 正在重新啟動應用程式...
+start "" "{current_app_dir}\\GenshinLyrePlayer.exe"
+echo 清理暫存檔案...
+rmdir /S /Q "{extract_dir}"
+del "{temp_path}"
+del "%~f0"
+"""
+        bat_path = os.path.join(tempfile.gettempdir(), "genshin_lyre_update.bat")
+        with open(bat_path, "w", encoding="utf-8") as f:
+            f.write(bat_content)
+            
+        # 在背景無痕執行批次檔
+        # CREATE_NO_WINDOW (0x08000000) 用來隱藏 cmd 視窗
+        subprocess.Popen([bat_path], creationflags=0x08000000)
+        
+        # 關閉主程式
+        QApplication.quit()
+        
+    @pyqtSlot(str)
+    def _on_error(self, err_msg: str) -> None:
+        self.status_label.setText("下載失敗！")
+        from PyQt5.QtWidgets import QMessageBox
+        QMessageBox.critical(self, "錯誤", f"下載更新時發生錯誤:\n{err_msg}")
+        self.reject()
 
 
 class TrackSelectionDialog(QDialog):
@@ -1180,7 +1322,7 @@ class MainWindow(QWidget):
         self._on_close()
         event.accept()
 
-    def _show_update_dialog(self, latest_version: str, release_url: str, release_notes: str) -> None:
+    def _show_update_dialog(self, latest_version: str, release_url: str, release_notes: str, download_url: str = "") -> None:
         """顯示更新提示對話框。"""
         from PyQt5.QtWidgets import QMessageBox
         import webbrowser
@@ -1189,10 +1331,14 @@ class MainWindow(QWidget):
         msg_box = QMessageBox(self)
         msg_box.setWindowTitle("發現新版本！")
         msg_box.setText(f"<b>有新版本 {latest_version} 可用！</b><br><br>目前版本: {APP_VERSION}<br><br>更新說明:<br>{release_notes if release_notes else '無詳細說明'}")
-        msg_box.setInformativeText("是否前往下載最新安裝包？")
+        msg_box.setInformativeText("是否要立即下載並自動安裝最新版本？")
         
         # 自定義按鈕
-        yes_btn = msg_box.addButton("💾 前往下載", QMessageBox.YesRole)
+        if download_url:
+            yes_btn = msg_box.addButton("🚀 立即下載並安裝", QMessageBox.YesRole)
+        else:
+            yes_btn = msg_box.addButton("💾 前往下載頁面", QMessageBox.YesRole)
+            
         no_btn = msg_box.addButton("下次再說", QMessageBox.NoRole)
         msg_box.setDefaultButton(yes_btn)
         
@@ -1207,4 +1353,9 @@ class MainWindow(QWidget):
         msg_box.exec_()
         
         if msg_box.clickedButton() == yes_btn:
-            webbrowser.open(release_url)
+            if download_url:
+                # 啟動應用內下載對話框
+                self._update_dlg = UpdateProgressDialog(download_url, self)
+                self._update_dlg.exec_()
+            else:
+                webbrowser.open(release_url)
