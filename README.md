@@ -1,10 +1,10 @@
-# 🎹 原神風物之詩琴 — 智慧自動彈琴與 AI 轉譜助手
+# 🎹 原神風物之詩琴 — 智慧自動彈琴
 
 [![Platform](https://img.shields.io/badge/platform-Windows-blue.svg)](https://www.microsoft.com/windows)
 [![Python](https://img.shields.io/badge/python-3.12-blue.svg)](https://www.python.org/)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 
-一個專為《原神》（Genshin Impact）設計的**智慧風物之詩琴/圓號自動演奏輔助工具**。本專案不僅支援基本的多軌 MIDI 檔案解析與播放，更獨創整合了 **Spotify 開源的 AI 語音轉錄引擎 (Basic Pitch)**，實現了「直接上傳音訊（MP3/M4A/WAV）秒變原神琴譜」的強大功能！
+一個專為《原神》（Genshin Impact）設計的**智慧風物之詩琴/圓號自動演奏輔助工具**。本專案支援基本的多軌 MIDI 檔案解析與播放
 
 ---
 
@@ -92,4 +92,4 @@ python setup_msi.py bdist_msi
 ## 📄 開源授權
 
 本專案採用 [MIT License](LICENSE) 授權開源。
-特別感謝 **Spotify Basic Pitch** 提供強大的 AI 轉錄支持。
+**Spotify Basic Pitch** 提供轉錄支持。
