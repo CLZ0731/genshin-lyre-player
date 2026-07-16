@@ -44,10 +44,12 @@ executables = [
     )
 ]
 
+from core.version import __version__ as APP_VERSION
+
 # 5. 呼叫 setup 執行打包
 setup(
     name="GenshinLyrePlayer",
-    version="1.0.0",
+    version=APP_VERSION,
     description="Genshin Impact Lyre Auto Player with AI Audio-to-MIDI transcription",
     options={
         "build_exe": build_exe_options,

@@ -26,7 +26,7 @@ from utils.hotkey_manager import HotkeyManager
 from utils.online_presets import fetch_online_presets, lookup_preset, export_preset
 from ui.styles import MAIN_STYLESHEET
 
-APP_VERSION = "1.0.0"
+from core.version import __version__ as APP_VERSION
 
 class UpdateCheckerThread(QThread):
     """
