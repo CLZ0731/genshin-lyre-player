@@ -44,6 +44,8 @@ class UpdateCheckerThread(QThread):
             import urllib.request
             import json
             import re
+            import ssl
+            
             url = "https://api.github.com/repos/CLZ0731/genshin-lyre-player/releases/latest"
             req = urllib.request.Request(
                 url, 
@@ -52,8 +54,12 @@ class UpdateCheckerThread(QThread):
                     "Accept": "application/vnd.github.v3+json"
                 }
             )
+            
+            # 忽略虛擬機可能缺乏最新根憑證導致的 SSL 錯誤
+            ssl_context = ssl._create_unverified_context()
+            
             # 設定 5 秒超時，防止無網路時阻塞
-            with urllib.request.urlopen(req, timeout=5) as response:
+            with urllib.request.urlopen(req, timeout=5, context=ssl_context) as response:
                 if response.status == 200:
                     data = json.loads(response.read().decode("utf-8"))
                     tag_name = data.get("tag_name", "").strip()
