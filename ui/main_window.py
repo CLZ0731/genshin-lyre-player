@@ -388,6 +388,13 @@ class MainWindow(QWidget):
         self._audio_transcribe_btn.clicked.connect(self._transcribe_audio)
         track_row.addWidget(self._audio_transcribe_btn)
 
+        self._delete_midi_btn = QPushButton("🗑️")
+        self._delete_midi_btn.setObjectName("WinBtn")
+        self._delete_midi_btn.setToolTip("刪除選取的樂譜")
+        self._delete_midi_btn.setFixedWidth(28)
+        self._delete_midi_btn.clicked.connect(self._delete_current_midi)
+        track_row.addWidget(self._delete_midi_btn)
+
         info_layout.addLayout(track_row)
 
         # BPM + 狀態行 + 樂器切換
@@ -625,6 +632,46 @@ class MainWindow(QWidget):
                         break
             except Exception as e:
                 self._note_display.setText("匯入失敗")
+
+    @pyqtSlot()
+    def _delete_current_midi(self) -> None:
+        """刪除當前選取的樂譜檔案。"""
+        if not self._midi_files or self._current_index >= len(self._midi_files):
+            return
+
+        filepath = self._midi_files[self._current_index]
+        filename = os.path.basename(filepath)
+        
+        # 彈出確認視窗
+        from PyQt5.QtWidgets import QMessageBox
+        reply = QMessageBox.question(
+            self,
+            "⚠️ 確認刪除",
+            f"確定要永久刪除樂譜「{filename}」嗎？\n此動作將無法復原！",
+            QMessageBox.Yes | QMessageBox.No,
+            QMessageBox.No
+        )
+        
+        if reply == QMessageBox.Yes:
+            # 停止播放
+            self._force_stop()
+            
+            try:
+                # 刪除實體檔案
+                if os.path.exists(filepath):
+                    os.remove(filepath)
+                    
+                # 移除設定檔中的偏好設定
+                self._config.clear_track_pref(filename)
+                
+                # 重新整理曲目
+                self._refresh_playlist()
+                
+                # 彈出提示通知
+                self._status_label.setText("已刪除樂譜")
+                
+            except Exception as e:
+                QMessageBox.critical(self, "錯誤", f"刪除檔案失敗: {e}")
 
     @pyqtSlot()
     def _open_track_settings(self) -> None:

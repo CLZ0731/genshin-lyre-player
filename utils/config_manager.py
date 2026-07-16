@@ -127,3 +127,10 @@ class ConfigManager:
             "melody_only": melody_only
         }
         self.save()
+
+    def clear_track_pref(self, filename: str) -> None:
+        """清除特定音軌的儲存偏好設定。"""
+        if "track_preferences" in self._config:
+            if filename in self._config["track_preferences"]:
+                del self._config["track_preferences"][filename]
+                self.save()
