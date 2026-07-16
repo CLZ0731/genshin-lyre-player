@@ -62,17 +62,16 @@ QLabel#VersionLabel {{
 /* ═══════════════════════════════════════════════
    面板容器 — Raised Indigo 卡片
    ═══════════════════════════════════════════════ */
-QWidget#TrackPanel,
-QWidget#ParamsPanel,
-QWidget#PlaybackPanel {{
+QFrame#TrackPanel,
+QFrame#ParamsPanel,
+QFrame#PlaybackPanel {{
     background-color: {C["surface_indigo"]};
     border: 1px solid {C["blurple_glow"]};
     border-radius: 16px;
-    padding: 10px 12px;
 }}
 
 /* 播放面板特殊處理：用更深的底色強調 */
-QWidget#PlaybackPanel {{
+QFrame#PlaybackPanel {{
     background-color: qlineargradient(
         x1:0, y1:0, x2:1, y2:1,
         stop:0 {C["surface_indigo"]},

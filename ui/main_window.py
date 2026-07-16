@@ -12,7 +12,7 @@ from PyQt5.QtWidgets import (
     QPushButton, QProgressBar, QDialog, QLineEdit,
     QFormLayout, QApplication, QComboBox, QFileDialog,
     QCheckBox, QScrollArea, QDialogButtonBox,
-    QSpinBox, QDoubleSpinBox
+    QSpinBox, QDoubleSpinBox, QFrame
 )
 from PyQt5.QtGui import QColor, QFont, QPainter, QBrush, QPen, QPainterPath
 import shutil
@@ -370,7 +370,7 @@ class MainWindow(QWidget):
         # ════════════════════════════════════════════
         # 面板一：曲目選擇 (Track Panel)
         # ════════════════════════════════════════════
-        track_panel = QWidget()
+        track_panel = QFrame()
         track_panel.setObjectName("TrackPanel")
         track_panel_layout = QVBoxLayout(track_panel)
         track_panel_layout.setContentsMargins(12, 8, 12, 10)
@@ -452,7 +452,7 @@ class MainWindow(QWidget):
         # ════════════════════════════════════════════
         # 面板二：演奏參數 (Params Panel)
         # ════════════════════════════════════════════
-        params_panel = QWidget()
+        params_panel = QFrame()
         params_panel.setObjectName("ParamsPanel")
         params_panel_layout = QVBoxLayout(params_panel)
         params_panel_layout.setContentsMargins(12, 8, 12, 10)
@@ -519,7 +519,7 @@ class MainWindow(QWidget):
         # ════════════════════════════════════════════
         # 面板三：播放控制 (Playback Panel)
         # ════════════════════════════════════════════
-        playback_panel = QWidget()
+        playback_panel = QFrame()
         playback_panel.setObjectName("PlaybackPanel")
         playback_panel_layout = QVBoxLayout(playback_panel)
         playback_panel_layout.setContentsMargins(12, 8, 12, 12)
