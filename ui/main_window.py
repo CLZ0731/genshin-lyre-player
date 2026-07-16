@@ -14,7 +14,7 @@ from PyQt5.QtWidgets import (
     QCheckBox, QScrollArea, QDialogButtonBox,
     QSpinBox, QDoubleSpinBox, QFrame
 )
-from PyQt5.QtGui import QColor, QFont, QPainter, QBrush, QPen, QPainterPath
+from PyQt5.QtGui import QColor, QFont, QPainter, QBrush, QPen, QPainterPath, QIcon
 import shutil
 import os
 
@@ -25,6 +25,7 @@ from utils.config_manager import ConfigManager
 from utils.hotkey_manager import HotkeyManager
 from utils.online_presets import fetch_online_presets, lookup_preset, export_preset
 from ui.styles import MAIN_STYLESHEET
+from ui.icons import IconFactory
 
 from core.version import __version__ as APP_VERSION
 
@@ -87,7 +88,7 @@ class TrackSelectionDialog(QDialog):
     """音軌選擇視窗"""
     def __init__(self, tracks_info: list[MidiTrackInfo], enabled_tracks: list[int] | None = None, melody_only: bool = False, parent=None):
         super().__init__(parent)
-        self.setWindowTitle("🎛️ 音軌過濾設定")
+        self.setWindowTitle("音軌過濾設定")
         self.setFixedSize(420, 480)
         self.setStyleSheet(MAIN_STYLESHEET)
         
@@ -99,7 +100,7 @@ class TrackSelectionDialog(QDialog):
         layout.addWidget(header)
 
         # Skyline 主旋律提取核取方塊
-        self._melody_only_cb = QCheckBox("🎵 啟用 Skyline 主旋律提取（自動過濾伴奏與低音）")
+        self._melody_only_cb = QCheckBox("啟用 Skyline 主旋律提取（自動過濾伴奏與低音）")
         self._melody_only_cb.setChecked(melody_only)
         self._melody_only_cb.setStyleSheet(
             "color: #35ed7e; font-size: 12px; font-weight: bold; padding: 6px; "
@@ -155,7 +156,7 @@ class SettingsDialog(QDialog):
     def __init__(self, config_manager: ConfigManager, parent=None):
         super().__init__(parent)
         self._config = config_manager
-        self.setWindowTitle("⚙ 系統設定")
+        self.setWindowTitle("系統設定")
         self.setFixedSize(300, 310)
         self.setWindowFlags(
             Qt.Dialog | Qt.FramelessWindowHint | Qt.WindowStaysOnTopHint
@@ -169,7 +170,7 @@ class SettingsDialog(QDialog):
         layout.setSpacing(10)
 
         # 標題
-        title = QLabel("⚙ 系統設定")
+        title = QLabel("系統設定")
         title.setStyleSheet(
             "color: #5865f2; font-size: 14px; font-weight: 800; "
             "font-family: 'Inter', 'Segoe UI', 'Microsoft YaHei UI'; letter-spacing: 1px;"
@@ -220,7 +221,7 @@ class SettingsDialog(QDialog):
         btn_layout = QHBoxLayout()
         btn_layout.setSpacing(8)
 
-        save_btn = QPushButton("💾 儲存")
+        save_btn = QPushButton("儲存")
         save_btn.clicked.connect(self._save)
 
         cancel_btn = QPushButton("取消")
@@ -343,7 +344,7 @@ class MainWindow(QWidget):
         title_layout.setContentsMargins(4, 0, 0, 0)
         title_layout.setSpacing(6)
 
-        self._title_label = QLabel("🎵 原神詩琴助手")
+        self._title_label = QLabel("風物之詩琴助手")
         self._title_label.setObjectName("TitleLabel")
         title_layout.addWidget(self._title_label)
 
@@ -353,21 +354,24 @@ class MainWindow(QWidget):
 
         title_layout.addStretch()
 
-        settings_btn = QPushButton("⚙")
+        settings_btn = QPushButton()
         settings_btn.setObjectName("WinBtn")
         settings_btn.setToolTip("快捷鍵設定")
+        settings_btn.setIcon(IconFactory.create_icon("gear", QColor(94, 94, 94)))
         settings_btn.clicked.connect(self._open_settings)
         title_layout.addWidget(settings_btn)
 
-        min_btn = QPushButton("─")
+        min_btn = QPushButton()
         min_btn.setObjectName("WinBtn")
         min_btn.setToolTip("最小化")
+        min_btn.setIcon(IconFactory.create_icon("minimize", QColor(94, 94, 94)))
         min_btn.clicked.connect(self.showMinimized)
         title_layout.addWidget(min_btn)
 
-        close_btn = QPushButton("✕")
+        close_btn = QPushButton()
         close_btn.setObjectName("CloseBtn")
         close_btn.setToolTip("關閉")
+        close_btn.setIcon(IconFactory.create_icon("close", QColor(94, 94, 94)))
         close_btn.clicked.connect(self._on_close)
         title_layout.addWidget(close_btn)
 
@@ -383,7 +387,7 @@ class MainWindow(QWidget):
         track_panel_layout.setSpacing(8)
 
         # 面板標題
-        track_title = QLabel("📂 曲目選擇")
+        track_title = QLabel("曲目選擇")
         track_title.setObjectName("PanelTitle")
         track_panel_layout.addWidget(track_title)
 
@@ -396,21 +400,24 @@ class MainWindow(QWidget):
         self._track_combo.currentIndexChanged.connect(self._on_track_changed)
         track_row.addWidget(self._track_combo, stretch=1)
 
-        self._add_midi_btn = QPushButton("➕")
+        self._add_midi_btn = QPushButton()
         self._add_midi_btn.setObjectName("ToolBtn")
         self._add_midi_btn.setToolTip("匯入 MIDI 檔案")
+        self._add_midi_btn.setIcon(IconFactory.create_icon("plus", QColor(0, 0, 0)))
         self._add_midi_btn.clicked.connect(self._import_midi)
         track_row.addWidget(self._add_midi_btn)
 
-        self._audio_transcribe_btn = QPushButton("🎙️")
+        self._audio_transcribe_btn = QPushButton()
         self._audio_transcribe_btn.setObjectName("ToolBtn")
         self._audio_transcribe_btn.setToolTip("AI 音訊轉錄 MIDI")
+        self._audio_transcribe_btn.setIcon(IconFactory.create_icon("transcribe", QColor(0, 0, 0)))
         self._audio_transcribe_btn.clicked.connect(self._transcribe_audio)
         track_row.addWidget(self._audio_transcribe_btn)
 
-        self._delete_midi_btn = QPushButton("🗑️")
+        self._delete_midi_btn = QPushButton()
         self._delete_midi_btn.setObjectName("ToolBtn")
         self._delete_midi_btn.setToolTip("刪除選取的樂譜")
+        self._delete_midi_btn.setIcon(IconFactory.create_icon("delete", QColor(0, 0, 0)))
         self._delete_midi_btn.clicked.connect(self._delete_current_midi)
         track_row.addWidget(self._delete_midi_btn)
 
@@ -421,11 +428,11 @@ class MainWindow(QWidget):
         info_row.setSpacing(6)
 
         self._instrument_combo = QComboBox()
-        self._instrument_combo.addItems(["🎵 詩琴 (短音)", "📯 圓號 (長音)"])
+        self._instrument_combo.addItems(["詩琴 (短音)", "圓號 (長音)"])
         self._instrument_combo.currentIndexChanged.connect(self._on_instrument_changed)
         info_row.addWidget(self._instrument_combo)
 
-        self._track_btn = QPushButton("🎛️ 音軌")
+        self._track_btn = QPushButton("音軌設定")
         self._track_btn.setObjectName("ControlBtn")
         self._track_btn.setToolTip("過濾伴奏與雜音")
         self._track_btn.clicked.connect(self._open_track_settings)
@@ -461,7 +468,7 @@ class MainWindow(QWidget):
         params_panel_layout.setContentsMargins(12, 8, 12, 10)
         params_panel_layout.setSpacing(8)
 
-        params_title = QLabel("🎛️ 演奏參數")
+        params_title = QLabel("演奏參數")
         params_title.setObjectName("PanelTitle")
         params_panel_layout.addWidget(params_title)
 
@@ -560,33 +567,38 @@ class MainWindow(QWidget):
         control_layout.setSpacing(8)
         control_layout.setContentsMargins(0, 4, 0, 0)
 
-        self._prev_btn = QPushButton("⏮")
+        self._prev_btn = QPushButton()
         self._prev_btn.setObjectName("ControlBtn")
         self._prev_btn.setToolTip("上一首 (F7)")
+        self._prev_btn.setIcon(IconFactory.create_icon("prev", QColor(0, 0, 0)))
         self._prev_btn.clicked.connect(self._prev_track)
         control_layout.addWidget(self._prev_btn)
 
-        self._stop_btn = QPushButton("⏹")
+        self._stop_btn = QPushButton()
         self._stop_btn.setObjectName("ControlBtn")
         self._stop_btn.setToolTip("停止 (F12)")
+        self._stop_btn.setIcon(IconFactory.create_icon("stop", QColor(0, 0, 0)))
         self._stop_btn.clicked.connect(self._force_stop)
         control_layout.addWidget(self._stop_btn)
 
-        self._play_btn = QPushButton("▶  播放")
+        self._play_btn = QPushButton("  播放")
         self._play_btn.setObjectName("PlayBtn")
         self._play_btn.setToolTip("播放/暫停 (F8)")
+        self._play_btn.setIcon(IconFactory.create_icon("play", QColor(255, 255, 255)))
         self._play_btn.clicked.connect(self._toggle_play_pause)
         control_layout.addWidget(self._play_btn)
 
-        self._next_btn = QPushButton("⏭")
+        self._next_btn = QPushButton()
         self._next_btn.setObjectName("ControlBtn")
         self._next_btn.setToolTip("下一首 (F9)")
+        self._next_btn.setIcon(IconFactory.create_icon("next", QColor(0, 0, 0)))
         self._next_btn.clicked.connect(self._next_track)
         control_layout.addWidget(self._next_btn)
 
-        self._refresh_btn = QPushButton("🔄")
+        self._refresh_btn = QPushButton()
         self._refresh_btn.setObjectName("ControlBtn")
         self._refresh_btn.setToolTip("重新掃描 MIDI 資料夾")
+        self._refresh_btn.setIcon(IconFactory.create_icon("refresh", QColor(0, 0, 0)))
         self._refresh_btn.clicked.connect(self._refresh_playlist)
         control_layout.addWidget(self._refresh_btn)
 
@@ -608,16 +620,11 @@ class MainWindow(QWidget):
         path.addRoundedRect(0.0, 0.0, float(self.width()), float(self.height()), 16.0, 16.0)
         painter.setClipPath(path)
 
-        # 漸層背景
-        from PyQt5.QtGui import QLinearGradient
-        grad = QLinearGradient(0, 0, self.width() * 0.4, self.height())
-        grad.setColorAt(0.0, QColor(10, 13, 58))
-        grad.setColorAt(0.5, QColor(16, 20, 64))
-        grad.setColorAt(1.0, QColor(10, 13, 58))
-        painter.fillPath(path, QBrush(grad))
+        # Uber Move 淺灰色單色背景
+        painter.fillPath(path, QBrush(QColor(243, 243, 243)))
 
-        # 繪製邊框
-        painter.setPen(QPen(QColor(88, 101, 242, 60), 1.0))
+        # 繪製 Uber Move 極細灰色外邊框
+        painter.setPen(QPen(QColor(226, 226, 226), 1.0))
         painter.drawPath(path)
         painter.end()
 
@@ -697,7 +704,8 @@ class MainWindow(QWidget):
                 f"0 / {self._current_midi.total_notes}"
             )
             self._note_display.setText("--")
-            self._play_btn.setText("▶  播放")
+            self._play_btn.setText("  播放")
+            self._play_btn.setIcon(IconFactory.create_icon("play", QColor(255, 255, 255)))
 
         except Exception as e:
             self._bpm_label.setText("BPM: --")
@@ -983,15 +991,18 @@ class MainWindow(QWidget):
             # 重新開始播放
             self._player.set_midi_data(self._current_midi)
             self._player.play()
-            self._play_btn.setText("⏸  暫停")
+            self._play_btn.setText("  暫停")
+            self._play_btn.setIcon(IconFactory.create_icon("pause", QColor(255, 255, 255)))
             self._status_label.setText("播放中...")
         elif self._player.is_playing:
             self._player.pause()
-            self._play_btn.setText("▶  播放")
+            self._play_btn.setText("  播放")
+            self._play_btn.setIcon(IconFactory.create_icon("play", QColor(255, 255, 255)))
             self._status_label.setText("已暫停")
         else:
             self._player.toggle_play_pause()
-            self._play_btn.setText("⏸  暫停")
+            self._play_btn.setText("  暫停")
+            self._play_btn.setIcon(IconFactory.create_icon("pause", QColor(255, 255, 255)))
             self._status_label.setText("播放中...")
 
     @pyqtSlot()
@@ -1016,7 +1027,8 @@ class MainWindow(QWidget):
         self._player.stop()
         if self._player.isRunning():
             self._player.wait(2000)  # 等待執行緒結束，最多 2 秒
-        self._play_btn.setText("▶  播放")
+        self._play_btn.setText("  播放")
+        self._play_btn.setIcon(IconFactory.create_icon("play", QColor(255, 255, 255)))
         self._status_label.setText("已停止")
         self._note_display.setText("--")
         self._progress_bar.setValue(0)
@@ -1035,9 +1047,11 @@ class MainWindow(QWidget):
         self._status_label.setText(state_text.get(state, state))
 
         if state == PlaybackState.PLAYING:
-            self._play_btn.setText("⏸  暫停")
+            self._play_btn.setText("  暫停")
+            self._play_btn.setIcon(IconFactory.create_icon("pause", QColor(255, 255, 255)))
         else:
-            self._play_btn.setText("▶  播放")
+            self._play_btn.setText("  播放")
+            self._play_btn.setIcon(IconFactory.create_icon("play", QColor(255, 255, 255)))
 
     @pyqtSlot(int, int)
     def _on_progress_updated(self, current: int, total: int) -> None:
@@ -1055,7 +1069,8 @@ class MainWindow(QWidget):
     @pyqtSlot()
     def _on_playback_finished(self) -> None:
         """播放結束回調。"""
-        self._play_btn.setText("▶  播放")
+        self._play_btn.setText("  播放")
+        self._play_btn.setIcon(IconFactory.create_icon("play", QColor(255, 255, 255)))
         self._status_label.setText("播放完畢")
         self._note_display.setText("✓")
 
@@ -1198,7 +1213,7 @@ class MainWindow(QWidget):
         
         # 建立自定義風格的對話框
         msg_box = QMessageBox(self)
-        msg_box.setWindowTitle("🔔 發現新版本！")
+        msg_box.setWindowTitle("發現新版本！")
         msg_box.setText(f"<b>有新版本 {latest_version} 可用！</b><br><br>目前版本: {APP_VERSION}<br><br>更新說明:<br>{release_notes if release_notes else '無詳細說明'}")
         msg_box.setInformativeText("是否前往下載最新安裝包？")
         
