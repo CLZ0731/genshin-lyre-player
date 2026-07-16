@@ -42,6 +42,7 @@ class UpdateCheckerThread(QThread):
         try:
             import urllib.request
             import json
+            import re
             url = "https://api.github.com/repos/CLZ0731/genshin-lyre-player/releases/latest"
             req = urllib.request.Request(
                 url, 
@@ -54,7 +55,12 @@ class UpdateCheckerThread(QThread):
             with urllib.request.urlopen(req, timeout=5) as response:
                 if response.status == 200:
                     data = json.loads(response.read().decode("utf-8"))
-                    latest_version = data.get("tag_name", "").strip().lstrip("v")
+                    tag_name = data.get("tag_name", "").strip()
+                    
+                    # 使用正則表達式提取純數字版本號 (例如: "GenshinLyrePlayer-1.0.1" -> "1.0.1", "v1.0.2" -> "1.0.2")
+                    version_match = re.search(r'\d+(\.\d+)+', tag_name)
+                    latest_version = version_match.group(0) if version_match else tag_name
+                    
                     release_url = data.get("html_url", "")
                     release_notes = data.get("body", "")
                     
