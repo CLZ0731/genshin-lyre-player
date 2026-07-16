@@ -495,4 +495,31 @@ QLabel#ParamLabel {{
     font-weight: 600;
     background: transparent;
 }}
+
+/* ═══════════════════════════════════════════════
+   小工具按鈕 (如 ➕, 🎙️, 🗑️)
+   ═══════════════════════════════════════════════ */
+QPushButton#ToolBtn {{
+    background-color: rgba(30, 35, 83, 200);
+    color: {C["ink"]};
+    border: 1px solid {C["hairline"]};
+    border-radius: 8px;
+    font-size: 12px;
+    font-family: "Segoe UI Emoji", "Segoe UI Symbol";
+    min-width: 28px;
+    max-width: 28px;
+    min-height: 28px;
+    max-height: 28px;
+    padding: 0;
+}}
+
+QPushButton#ToolBtn:hover {{
+    background-color: {C["blurple"]};
+    border-color: {C["green"]};
+    color: {C["ink"]};
+}}
+
+QPushButton#ToolBtn:pressed {{
+    background-color: {C["blurple_dark"]};
+}}
 """

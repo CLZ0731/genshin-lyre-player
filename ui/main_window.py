@@ -275,10 +275,16 @@ class MainWindow(QWidget):
         )
         self.setObjectName("MainWindow")
         self.setAttribute(Qt.WA_TranslucentBackground)
-        self.setFixedSize(480, 540)
+        self.setMinimumSize(420, 500)
+        self.resize(480, 540)
+        self.setMouseTracking(True)
 
-        # ── 拖曳狀態 ──
+        # ── 拖曳與縮放狀態 ──
         self._drag_pos: QPoint | None = None
+        self._border_width = 8
+        self._resize_dir = None
+        self._press_global_pos = QPoint()
+        self._press_geometry = None
 
         # ── 初始化元件 ──
         self._config = ConfigManager()
@@ -391,23 +397,20 @@ class MainWindow(QWidget):
         track_row.addWidget(self._track_combo, stretch=1)
 
         self._add_midi_btn = QPushButton("➕")
-        self._add_midi_btn.setObjectName("WinBtn")
+        self._add_midi_btn.setObjectName("ToolBtn")
         self._add_midi_btn.setToolTip("匯入 MIDI 檔案")
-        self._add_midi_btn.setFixedWidth(28)
         self._add_midi_btn.clicked.connect(self._import_midi)
         track_row.addWidget(self._add_midi_btn)
 
         self._audio_transcribe_btn = QPushButton("🎙️")
-        self._audio_transcribe_btn.setObjectName("WinBtn")
+        self._audio_transcribe_btn.setObjectName("ToolBtn")
         self._audio_transcribe_btn.setToolTip("AI 音訊轉錄 MIDI")
-        self._audio_transcribe_btn.setFixedWidth(28)
         self._audio_transcribe_btn.clicked.connect(self._transcribe_audio)
         track_row.addWidget(self._audio_transcribe_btn)
 
         self._delete_midi_btn = QPushButton("🗑️")
-        self._delete_midi_btn.setObjectName("WinBtn")
+        self._delete_midi_btn.setObjectName("ToolBtn")
         self._delete_midi_btn.setToolTip("刪除選取的樂譜")
-        self._delete_midi_btn.setFixedWidth(28)
         self._delete_midi_btn.clicked.connect(self._delete_current_midi)
         track_row.addWidget(self._delete_midi_btn)
 
@@ -423,7 +426,7 @@ class MainWindow(QWidget):
         info_row.addWidget(self._instrument_combo)
 
         self._track_btn = QPushButton("🎛️ 音軌")
-        self._track_btn.setObjectName("WinBtn")
+        self._track_btn.setObjectName("ControlBtn")
         self._track_btn.setToolTip("過濾伴奏與雜音")
         self._track_btn.clicked.connect(self._open_track_settings)
         info_row.addWidget(self._track_btn)
@@ -1073,21 +1076,107 @@ class MainWindow(QWidget):
 
     # ═══════════════════ 視窗拖曳 ═══════════════════
 
+    def _get_resize_direction(self, pos) -> str | None:
+        w = self.width()
+        h = self.height()
+        b = self._border_width
+        x = pos.x()
+        y = pos.y()
+        
+        left = x < b
+        right = x > w - b
+        top = y < b
+        bottom = y > h - b
+        
+        if left and top: return 'TL'
+        if right and top: return 'TR'
+        if left and bottom: return 'BL'
+        if right and bottom: return 'BR'
+        if left: return 'L'
+        if right: return 'R'
+        if top: return 'T'
+        if bottom: return 'B'
+        return None
+
     def mousePressEvent(self, event) -> None:
-        """記錄滑鼠按下位置（用於拖曳）。"""
+        """記錄滑鼠按下位置，辨識是拖曳視窗還是拉伸縮放。"""
         if event.button() == Qt.LeftButton:
-            self._drag_pos = event.globalPos() - self.frameGeometry().topLeft()
+            pos = event.pos()
+            dir_ = self._get_resize_direction(pos)
+            if dir_:
+                self._resize_dir = dir_
+                self._press_global_pos = event.globalPos()
+                self._press_geometry = self.geometry()
+            else:
+                self._resize_dir = None
+                self._drag_pos = event.globalPos() - self.frameGeometry().topLeft()
             event.accept()
 
     def mouseMoveEvent(self, event) -> None:
-        """拖曳移動視窗。"""
-        if event.buttons() == Qt.LeftButton and self._drag_pos is not None:
-            self.move(event.globalPos() - self._drag_pos)
-            event.accept()
+        """處理滑鼠懸停光標更新與拖曳/縮放拉伸。"""
+        pos = event.pos()
+        
+        # 1. 處理滑鼠左鍵按下的拖曳/縮放狀態
+        if event.buttons() == Qt.LeftButton:
+            if self._resize_dir:
+                delta = event.globalPos() - self._press_global_pos
+                rect = self.geometry()
+                min_w = 420
+                min_h = 500
+                
+                new_left = rect.left()
+                new_top = rect.top()
+                new_width = rect.width()
+                new_height = rect.height()
+                
+                if 'L' in self._resize_dir:
+                    proposed_left = self._press_geometry.left() + delta.x()
+                    proposed_width = self._press_geometry.width() - delta.x()
+                    if proposed_width >= min_w:
+                        new_left = proposed_left
+                        new_width = proposed_width
+                if 'R' in self._resize_dir:
+                    proposed_width = self._press_geometry.width() + delta.x()
+                    if proposed_width >= min_w:
+                        new_width = proposed_width
+                if 'T' in self._resize_dir:
+                    proposed_top = self._press_geometry.top() + delta.y()
+                    height_diff = self._press_geometry.height() - delta.y()
+                    if height_diff >= min_h:
+                        new_top = proposed_top
+                        new_height = height_diff
+                if 'B' in self._resize_dir:
+                    proposed_height = self._press_geometry.height() + delta.y()
+                    if proposed_height >= min_h:
+                        new_height = proposed_height
+                        
+                self.setGeometry(new_left, new_top, new_width, new_height)
+                event.accept()
+                return
+            elif self._drag_pos is not None:
+                self.move(event.globalPos() - self._drag_pos)
+                event.accept()
+                return
+                
+        # 2. 未按下按鍵時，根據懸停位置更新滑鼠指標圖示
+        dir_ = self._get_resize_direction(pos)
+        if dir_ in ('TL', 'BR'):
+            self.setCursor(Qt.SizeFDiagCursor)
+        elif dir_ in ('TR', 'BL'):
+            self.setCursor(Qt.SizeBDiagCursor)
+        elif dir_ in ('L', 'R'):
+            self.setCursor(Qt.SizeHorCursor)
+        elif dir_ in ('T', 'B'):
+            self.setCursor(Qt.SizeVerCursor)
+        else:
+            self.setCursor(Qt.ArrowCursor)
 
     def mouseReleaseEvent(self, event) -> None:
-        """釋放拖曳。"""
+        """釋放拖曳或縮放。"""
         self._drag_pos = None
+        self._resize_dir = None
+        self.setCursor(Qt.ArrowCursor)
+        event.accept()
 
     # ═══════════════════ 關閉處理 ═══════════════════
 
