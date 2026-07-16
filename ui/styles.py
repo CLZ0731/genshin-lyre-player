@@ -141,13 +141,12 @@ QPushButton#ControlBtn {{
     background-color: {C["canvas_soft"]};
     color: {C["ink"]};
     border: none;
-    border-radius: 15px; /* 高度 30px 的半值，呈現完美膠囊 */
-    padding: 6px 12px;
-    font-family: "UberMoveText", "Inter", "Segoe UI", sans-serif;
-    font-size: 13px;
-    font-weight: 500;
-    min-width: 48px;
-    min-height: 30px;
+    border-radius: 16px; /* 32px 高度的一半，呈現完美圓形 */
+    padding: 0;
+    min-width: 32px;
+    max-width: 32px;
+    min-height: 32px;
+    max-height: 32px;
 }}
 
 QPushButton#ControlBtn:hover {{
@@ -170,13 +169,15 @@ QPushButton#PlayBtn {{
     background-color: {C["primary"]};
     color: {C["canvas"]};
     border: none;
-    border-radius: 17px; /* 高度 34px 的半值 */
-    padding: 8px 24px;
+    border-radius: 16px; /* 32px 高度的一半 */
+    padding: 4px 12px;
     font-family: "UberMoveText", "Inter", "Segoe UI", sans-serif;
-    font-size: 14px;
+    font-size: 13px;
     font-weight: 500;
-    min-width: 120px;
-    min-height: 34px;
+    min-width: 95px;
+    max-width: 115px;
+    min-height: 32px;
+    max-height: 32px;
 }}
 
 QPushButton#PlayBtn:hover {{

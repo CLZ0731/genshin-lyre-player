@@ -7,17 +7,23 @@ class IconFactory:
     自繪向量圖示工廠類別。
     使用 QPainter 在透明背景的 QPixmap 上直接繪製極簡的扁平向量圖示。
     這保證了 100% 離線可用、解析度無損、無版權問題，並完美契合 Uber Move 風格。
+    包含 4x 多倍率抗鋸齒渲染，解決 High DPI 螢幕（如 4K 螢幕、125%/150%/200% 縮放）下模糊的問題。
     """
     
     @staticmethod
     def create_icon(icon_type: str, color: QColor = QColor(0, 0, 0), size: int = 24) -> QIcon:
-        pixmap = QPixmap(size, size)
+        scale = 4.0
+        draw_size = int(size * scale)
+        pixmap = QPixmap(draw_size, draw_size)
         pixmap.fill(Qt.transparent)
         
         painter = QPainter(pixmap)
         painter.setRenderHint(QPainter.Antialiasing)
         
-        # 設置畫筆樣式
+        # 縮放繪圖矩陣，使我們能用邏輯像素 (0 ~ size) 繪製，同時在實體 Pixmap 上得到 4 倍的高畫質細節
+        painter.scale(scale, scale)
+        
+        # 設置畫筆樣式 (邏輯寬度為 2.0，縮放後實體寬度為 8.0)
         pen = QPen(color)
         pen.setWidthF(2.0)
         pen.setCapStyle(Qt.RoundCap)
@@ -39,7 +45,7 @@ class IconFactory:
             x = (size - w) / 2
             y = size * 0.16
             painter.setBrush(Qt.NoBrush)
-            painter.drawRoundedRect(int(x), int(y), int(w), int(h), float(w/2), float(w/2))
+            painter.drawRoundedRect(QRectF(x, y, w, h), float(w/2), float(w/2))
             
             # 麥克風底部弧線
             cup_w = size * 0.48
@@ -62,10 +68,10 @@ class IconFactory:
             
             # 蓋子把手
             painter.setBrush(Qt.NoBrush)
-            painter.drawRect(int(size/2 - 3), int(margin_y), 6, 4)
+            painter.drawRect(QRectF(size/2 - 3, margin_y, 6, 4))
             
             # 垃圾桶桶身
-            painter.drawRect(int(margin_x), int(margin_y + 4), int(size - 2*margin_x), int(size - 2*margin_y - 4))
+            painter.drawRect(QRectF(margin_x, margin_y + 4, size - 2*margin_x, size - 2*margin_y - 4))
             
             # 桶身內部條紋
             painter.drawLine(int(size/2 - 2), int(margin_y + 8), int(size/2 - 2), int(size - margin_y - 4))
@@ -179,4 +185,7 @@ class IconFactory:
             painter.drawPath(apath)
             
         painter.end()
+        
+        # 關鍵點：為 QPixmap 設置物理與邏輯像素的比率，讓高畫質細節在 High DPI 螢幕上正確平滑渲染，徹底解決模糊問題。
+        pixmap.setDevicePixelRatio(scale)
         return QIcon(pixmap)

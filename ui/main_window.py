@@ -276,7 +276,7 @@ class MainWindow(QWidget):
         )
         self.setObjectName("MainWindow")
         self.setAttribute(Qt.WA_TranslucentBackground)
-        self.setMinimumSize(420, 500)
+        self.setMinimumSize(440, 520)
         self.resize(480, 540)
         self.setMouseTracking(True)
 
