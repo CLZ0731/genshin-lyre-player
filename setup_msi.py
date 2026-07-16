@@ -18,7 +18,8 @@ build_exe_options = {
         (saved_models_src, os.path.join("lib", "basic_pitch", "saved_models")),
         ("midi_files", "midi_files")
     ],
-    "excludes": ["tkinter"]
+    "excludes": ["tkinter"],
+    "include_msvcr": True
 }
 
 # 3. 設定 Windows Installer (MSI) 選項
