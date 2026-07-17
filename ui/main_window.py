@@ -650,8 +650,8 @@ class MainWindow(QWidget):
         )
         self.setObjectName("MainWindow")
         self.setAttribute(Qt.WA_TranslucentBackground)
-        self.setMinimumSize(440, 520)
-        self.resize(480, 540)
+        self.setMinimumSize(440, 560)
+        self.resize(480, 580)
         self.setMouseTracking(True)
 
         # ── 拖曳與縮放狀態 ──
@@ -703,6 +703,9 @@ class MainWindow(QWidget):
 
         # ── 載入曲目 ──
         self._refresh_playlist()
+
+        # ── 重新整理目標視窗 ──
+        self._refresh_genshin_windows()
 
         # ── 註冊快捷鍵 ──
         self._hotkey_manager.register(self._config.hotkeys)
@@ -916,6 +919,31 @@ class MainWindow(QWidget):
 
         params_row2.addStretch()
         params_panel_layout.addLayout(params_row2)
+
+        # 第三列：目標視窗
+        params_row3 = QHBoxLayout()
+        params_row3.setSpacing(8)
+
+        target_label = QLabel("目標視窗")
+        target_label.setObjectName("ParamLabel")
+        target_label.setToolTip("選擇按鍵發送的目的遊戲視窗，支援背景模擬")
+        params_row3.addWidget(target_label)
+
+        self._target_hwnd_combo = QComboBox()
+        self._target_hwnd_combo.setMinimumWidth(220)
+        self._target_hwnd_combo.setToolTip("「前景視窗」即為傳統模式，特定視窗為背景模擬模式（適合開多個遊戲）")
+        self._target_hwnd_combo.currentIndexChanged.connect(self._on_target_hwnd_changed)
+        params_row3.addWidget(self._target_hwnd_combo)
+
+        self._refresh_windows_btn = QPushButton()
+        self._refresh_windows_btn.setObjectName("ToolBtn")
+        self._refresh_windows_btn.setToolTip("重新掃描原神視窗")
+        self._refresh_windows_btn.setIcon(IconFactory.create_icon("refresh", QColor(0, 0, 0)))
+        self._refresh_windows_btn.clicked.connect(self._refresh_genshin_windows)
+        params_row3.addWidget(self._refresh_windows_btn)
+
+        params_row3.addStretch()
+        params_panel_layout.addLayout(params_row3)
 
         main_layout.addWidget(params_panel)
 
@@ -1261,6 +1289,8 @@ class MainWindow(QWidget):
         self._velocity_cb.setEnabled(enabled)
         self._instrument_combo.setEnabled(enabled)
         self._track_btn.setEnabled(enabled)
+        self._target_hwnd_combo.setEnabled(enabled)
+        self._refresh_windows_btn.setEnabled(enabled)
 
     @pyqtSlot(str)
     def _on_transcribe_success(self, midi_path: str) -> None:
@@ -1311,6 +1341,36 @@ class MainWindow(QWidget):
     def _on_velocity_changed(self) -> None:
         """當力度演奏開關變更時。"""
         self._player.set_velocity_dynamics(self._velocity_cb.isChecked())
+
+    def _refresh_genshin_windows(self) -> None:
+        """掃描系統中的原神遊戲視窗並填入下拉選單。"""
+        from core.key_simulator import get_genshin_windows
+        
+        self._target_hwnd_combo.blockSignals(True)
+        self._target_hwnd_combo.clear()
+        
+        # 預設項：前景活動視窗 (SendInput)
+        self._target_hwnd_combo.addItem("活動視窗 (前景 / SendInput)", None)
+        
+        # 掃描原神視窗
+        windows = get_genshin_windows()
+        for hwnd, title in windows:
+            self._target_hwnd_combo.addItem(title, hwnd)
+            
+        self._target_hwnd_combo.blockSignals(False)
+        self._target_hwnd_combo.setCurrentIndex(0)
+        self._on_target_hwnd_changed(0)
+
+    @pyqtSlot(int)
+    def _on_target_hwnd_changed(self, index: int) -> None:
+        """當選取的目標遊戲視窗改變時。"""
+        hwnd = self._target_hwnd_combo.currentData()
+        self._player.set_target_hwnd(hwnd)
+        self._slave_executor.set_target_hwnd(hwnd)
+        if hwnd:
+            print(f"[目標視窗] 已切換至特定視窗 (HWND: {hwnd})，啟用背景模擬模式")
+        else:
+            print("[目標視窗] 已切換至活動視窗，使用傳統前景 SendInput 模式")
 
     @pyqtSlot(int)
     def _on_track_changed(self, index: int) -> None:
@@ -1442,9 +1502,13 @@ class MainWindow(QWidget):
         if state == PlaybackState.PLAYING:
             self._play_btn.setText("  暫停")
             self._play_btn.setIcon(IconFactory.create_icon("pause", QColor(255, 255, 255)))
+            self._target_hwnd_combo.setEnabled(False)
+            self._refresh_windows_btn.setEnabled(False)
         else:
             self._play_btn.setText("  播放")
             self._play_btn.setIcon(IconFactory.create_icon("play", QColor(255, 255, 255)))
+            self._target_hwnd_combo.setEnabled(True)
+            self._refresh_windows_btn.setEnabled(True)
 
     @pyqtSlot(int, int)
     def _on_progress_updated(self, current: int, total: int) -> None:

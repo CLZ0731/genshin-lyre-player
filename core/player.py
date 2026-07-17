@@ -53,6 +53,10 @@ class PlayerThread(QThread):
         self._local_play_ranges = {'low', 'mid', 'high'}
         self._remote_play_ranges = set()
         self._remote_instrument_mode = "follow"  # "follow", "lyre", "horn"
+        self._target_hwnd = None
+
+    def set_target_hwnd(self, hwnd: int | None) -> None:
+        self._target_hwnd = hwnd
 
     def set_midi_data(self, midi_data: ParsedMidi) -> None:
         self._midi_data = midi_data
@@ -114,7 +118,7 @@ class PlayerThread(QThread):
         for key_char in list(self._active_keys):
             scan_code = SCAN_CODES.get(key_char.upper())
             if scan_code is not None:
-                release_key(scan_code)
+                release_key(scan_code, self._target_hwnd, key_char)
         self._active_keys.clear()
 
     @property
@@ -234,10 +238,10 @@ class PlayerThread(QThread):
                         scan_code = SCAN_CODES.get(key_char)
                         if scan_code is not None:
                             if event.action == 'press':
-                                press_key(scan_code)
+                                press_key(scan_code, self._target_hwnd, key_char)
                                 self._active_keys.add(key_char)
                             elif event.action == 'release':
-                                release_key(scan_code)
+                                release_key(scan_code, self._target_hwnd, key_char)
                                 self._active_keys.discard(key_char)
                 else:
                     # 詩琴模式：只在按下時觸發一次短點擊
@@ -252,9 +256,9 @@ class PlayerThread(QThread):
                             dyn_max = self._delay_max
                         
                         if len(local_keys) == 1:
-                            press_and_release(local_keys[0], dyn_min, dyn_max)
+                            press_and_release(local_keys[0], dyn_min, dyn_max, self._target_hwnd)
                         else:
-                            press_multiple_keys(local_keys, dyn_min, dyn_max)
+                            press_multiple_keys(local_keys, dyn_min, dyn_max, self._target_hwnd)
 
                 # ── 發射信號更新 UI ──
                 if event.action == 'press':
@@ -284,6 +288,11 @@ class SlaveKeyExecutor(QThread):
         self._delay_min = 0.02
         self._delay_max = 0.05
         self._instrument_mode = "lyre"  # 'lyre' 或 'horn'
+        self._target_hwnd = None
+
+    def set_target_hwnd(self, hwnd: int | None):
+        """設定被控端的目標視窗。"""
+        self._target_hwnd = hwnd
 
     def set_delay(self, delay_min: float, delay_max: float):
         self._delay_min = delay_min
@@ -326,19 +335,19 @@ class SlaveKeyExecutor(QThread):
                     scan_code = SCAN_CODES.get(key_char.upper())
                     if scan_code is not None:
                         if action == "press":
-                            press_key(scan_code)
+                            press_key(scan_code, self._target_hwnd, key_char)
                             self._active_keys.add(key_char.upper())
                         elif action == "release":
-                            release_key(scan_code)
+                            release_key(scan_code, self._target_hwnd, key_char)
                             self._active_keys.discard(key_char.upper())
             else:
                 if action == "press" and keys:
                     dyn_min = self._delay_min
                     dyn_max = self._delay_max
                     if len(keys) == 1:
-                        press_and_release(keys[0].upper(), dyn_min, dyn_max)
+                        press_and_release(keys[0].upper(), dyn_min, dyn_max, self._target_hwnd)
                     else:
-                        press_multiple_keys([k.upper() for k in keys], dyn_min, dyn_max)
+                        press_multiple_keys([k.upper() for k in keys], dyn_min, dyn_max, self._target_hwnd)
             
             self.queue.task_done()
             
@@ -348,7 +357,7 @@ class SlaveKeyExecutor(QThread):
         for key_char in list(self._active_keys):
             scan_code = SCAN_CODES.get(key_char)
             if scan_code is not None:
-                release_key(scan_code)
+                release_key(scan_code, self._target_hwnd, key_char)
         self._active_keys.clear()
 
     def stop(self):
