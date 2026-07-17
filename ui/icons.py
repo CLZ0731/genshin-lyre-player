@@ -184,6 +184,22 @@ class IconFactory:
             apath.closeSubpath()
             painter.drawPath(apath)
             
+        elif icon_type == "network":
+            # 🌐 網路 (三個相連的圓點)
+            painter.setBrush(brush)
+            # 頂點
+            painter.drawEllipse(QRectF(size/2 - 3, size * 0.22, 6, 6))
+            # 左下點
+            painter.drawEllipse(QRectF(size * 0.22, size * 0.68, 6, 6))
+            # 右下點
+            painter.drawEllipse(QRectF(size * 0.68, size * 0.68, 6, 6))
+            
+            # 連接線
+            painter.setBrush(Qt.NoBrush)
+            painter.drawLine(int(size/2), int(size * 0.22 + 6), int(size * 0.22 + 3), int(size * 0.68))
+            painter.drawLine(int(size/2), int(size * 0.22 + 6), int(size * 0.68 + 3), int(size * 0.68))
+            painter.drawLine(int(size * 0.22 + 6), int(size * 0.68 + 3), int(size * 0.68), int(size * 0.68 + 3))
+            
         painter.end()
         
         # 關鍵點：為 QPixmap 設置物理與邏輯像素的比率，讓高畫質細節在 High DPI 螢幕上正確平滑渲染，徹底解決模糊問題。

@@ -12,7 +12,7 @@ from PyQt5.QtWidgets import (
     QPushButton, QProgressBar, QDialog, QLineEdit,
     QFormLayout, QApplication, QComboBox, QFileDialog,
     QCheckBox, QScrollArea, QDialogButtonBox,
-    QSpinBox, QDoubleSpinBox, QFrame
+    QSpinBox, QDoubleSpinBox, QFrame, QGroupBox, QRadioButton, QGridLayout
 )
 from PyQt5.QtGui import QColor, QFont, QPainter, QBrush, QPen, QPainterPath, QIcon
 import shutil
@@ -298,6 +298,237 @@ class TrackSelectionDialog(QDialog):
         return self._melody_only_cb.isChecked()
 
 
+class NetworkDuetDialog(QDialog):
+    """網路雙人聯彈設定對話框"""
+    def __init__(self, manager, parent=None):
+        super().__init__(parent)
+        self.manager = manager
+        self.setWindowTitle("網路雙人聯彈設定")
+        self.setFixedSize(400, 380)
+        self.setStyleSheet(MAIN_STYLESHEET)
+        
+        # 保存主視窗參考以更新播放音域
+        self.main_window = parent
+
+        layout = QVBoxLayout(self)
+
+        # 角色選擇 (主控端 / 被控端)
+        mode_group = QGroupBox("選擇連線角色")
+        mode_group.setStyleSheet("QGroupBox { color: #000000; font-weight: bold; }")
+        mode_layout = QHBoxLayout(mode_group)
+        
+        self.slave_radio = QRadioButton("我是被控端 (播放琴音)")
+        self.master_radio = QRadioButton("我是主控端 (載入樂譜)")
+        
+        mode_layout.addWidget(self.slave_radio)
+        mode_layout.addWidget(self.master_radio)
+        layout.addWidget(mode_group)
+
+        # 動態內容區域
+        self.content_widget = QWidget()
+        self.content_layout = QVBoxLayout(self.content_widget)
+        self.content_layout.setContentsMargins(0, 5, 0, 5)
+        layout.addWidget(self.content_widget)
+
+        # 底部按鈕
+        self.btn_box = QDialogButtonBox(QDialogButtonBox.Close)
+        self.btn_box.rejected.connect(self.reject)
+        layout.addWidget(self.btn_box)
+
+        # 信號綁定
+        self.slave_radio.toggled.connect(self._on_mode_changed)
+        self.master_radio.toggled.connect(self._on_mode_changed)
+
+        # 綁定網路管理器信號，即時更新連線狀態
+        self.manager.status_changed.connect(self._update_status)
+        self.manager.error_occurred.connect(self._show_error)
+
+        # 初始化連線狀態
+        if self.manager.is_connected:
+            if self.manager.is_master:
+                self.master_radio.setChecked(True)
+            else:
+                self.slave_radio.setChecked(True)
+        else:
+            self.slave_radio.setChecked(True)
+
+    def _clear_content_layout(self):
+        while self.content_layout.count():
+            item = self.content_layout.takeAt(0)
+            widget = item.widget()
+            if widget:
+                widget.deleteLater()
+
+    def _on_mode_changed(self):
+        self._clear_content_layout()
+        if self.slave_radio.isChecked():
+            self._setup_slave_ui()
+        else:
+            self._setup_master_ui()
+
+    def _setup_slave_ui(self):
+        from core.network_sync import get_local_ip, ip_to_code
+        local_ip = get_local_ip()
+        pairing_code = ip_to_code(local_ip)
+        
+        code_label = QLabel("您的被控配對碼：")
+        code_label.setStyleSheet("color: #555555; font-size: 13px; font-weight: bold;")
+        self.content_layout.addWidget(code_label)
+        
+        self.code_display = QLineEdit(pairing_code)
+        self.code_display.setReadOnly(True)
+        self.code_display.setAlignment(Qt.AlignCenter)
+        self.code_display.setStyleSheet(
+            "QLineEdit { font-size: 22px; font-weight: bold; color: #5865f2; "
+            "background-color: #f3f3f3; border: 2px solid #5865f2; border-radius: 8px; padding: 4px; }"
+        )
+        self.content_layout.addWidget(self.code_display)
+        
+        self.status_label = QLabel("等待主控端連線...")
+        self.status_label.setAlignment(Qt.AlignCenter)
+        self.status_label.setStyleSheet("color: #222222; font-size: 13px; font-weight: bold; margin-top: 10px;")
+        self.content_layout.addWidget(self.status_label)
+        
+        self.action_btn = QPushButton("開始等待連線")
+        self.action_btn.setStyleSheet(
+            "QPushButton { background-color: #5865f2; color: white; border-radius: 8px; padding: 8px; font-weight: bold; }"
+            "QPushButton:hover { background-color: #4752c4; }"
+        )
+        self.action_btn.clicked.connect(self._start_slave_server)
+        self.content_layout.addWidget(self.action_btn)
+        
+        # 若已連線，顯示已連線狀態
+        if self.manager.is_connected and not self.manager.is_master:
+            self.action_btn.setText("斷開連線")
+            self.action_btn.clicked.disconnect()
+            self.action_btn.clicked.connect(self._disconnect_network)
+            self.status_label.setText("已連線至主控端")
+
+    def _start_slave_server(self):
+        self.manager.start_host_mode()
+        self.action_btn.setText("斷開連線")
+        self.action_btn.clicked.disconnect()
+        self.action_btn.clicked.connect(self._disconnect_network)
+
+    def _setup_master_ui(self):
+        code_label = QLabel("請輸入被控端的配對碼：")
+        code_label.setStyleSheet("color: #555555; font-size: 13px; font-weight: bold;")
+        self.content_layout.addWidget(code_label)
+        
+        self.code_input = QLineEdit()
+        self.code_input.setAlignment(Qt.AlignCenter)
+        self.code_input.setPlaceholderText("請輸入 6 ~ 7 碼英文數字配對碼")
+        self.code_input.setStyleSheet(
+            "QLineEdit { font-size: 16px; color: #000000; "
+            "border: 1px solid #cccccc; border-radius: 8px; padding: 4px; }"
+        )
+        self.content_layout.addWidget(self.code_input)
+        
+        self.status_label = QLabel("請輸入配對碼並點選連線")
+        self.status_label.setAlignment(Qt.AlignCenter)
+        self.status_label.setStyleSheet("color: #222222; font-size: 13px; font-weight: bold; margin-top: 5px;")
+        self.content_layout.addWidget(self.status_label)
+        
+        self.action_btn = QPushButton("連線")
+        self.action_btn.setStyleSheet(
+            "QPushButton { background-color: #5865f2; color: white; border-radius: 8px; padding: 8px; font-weight: bold; }"
+            "QPushButton:hover { background-color: #4752c4; }"
+        )
+        self.action_btn.clicked.connect(self._connect_to_slave)
+        self.content_layout.addWidget(self.action_btn)
+        
+        # 音域配置群組
+        config_group = QGroupBox("雙人合奏音域分配")
+        config_group.setStyleSheet("QGroupBox { color: #000000; font-weight: bold; }")
+        config_layout = QGridLayout(config_group)
+        
+        config_layout.addWidget(QLabel("主控本地彈奏:"), 0, 0)
+        self.local_low = QCheckBox("低音")
+        self.local_mid = QCheckBox("中音")
+        self.local_high = QCheckBox("高音")
+        config_layout.addWidget(self.local_low, 0, 1)
+        config_layout.addWidget(self.local_mid, 0, 2)
+        config_layout.addWidget(self.local_high, 0, 3)
+        
+        config_layout.addWidget(QLabel("被控遠端彈奏:"), 1, 0)
+        self.remote_low = QCheckBox("低音")
+        self.remote_mid = QCheckBox("中音")
+        self.remote_high = QCheckBox("高音")
+        config_layout.addWidget(self.remote_low, 1, 1)
+        config_layout.addWidget(self.remote_mid, 1, 2)
+        config_layout.addWidget(self.remote_high, 1, 3)
+        
+        # 載入目前的音域配置
+        self.local_low.setChecked('low' in self.main_window._local_play_ranges)
+        self.local_mid.setChecked('mid' in self.main_window._local_play_ranges)
+        self.local_high.setChecked('high' in self.main_window._local_play_ranges)
+        
+        self.remote_low.setChecked('low' in self.main_window._remote_play_ranges)
+        self.remote_mid.setChecked('mid' in self.main_window._remote_play_ranges)
+        self.remote_high.setChecked('high' in self.main_window._remote_play_ranges)
+        
+        # 綁定狀態改變
+        self.local_low.toggled.connect(self._update_ranges)
+        self.local_mid.toggled.connect(self._update_ranges)
+        self.local_high.toggled.connect(self._update_ranges)
+        self.remote_low.toggled.connect(self._update_ranges)
+        self.remote_mid.toggled.connect(self._update_ranges)
+        self.remote_high.toggled.connect(self._update_ranges)
+
+        self.content_layout.addWidget(config_group)
+        
+        # 若已連線，顯示已連線狀態
+        if self.manager.is_connected and self.manager.is_master:
+            self.action_btn.setText("斷開連線")
+            self.action_btn.clicked.disconnect()
+            self.action_btn.clicked.connect(self._disconnect_network)
+            self.status_label.setText("已連線至被控端")
+
+    def _connect_to_slave(self):
+        code = self.code_input.text().strip()
+        if not code:
+            return
+        self.manager.connect_as_master(code)
+        
+    def _disconnect_network(self):
+        self.manager.disconnect_all()
+        self._on_mode_changed()
+
+    def _update_status(self, text: str):
+        if hasattr(self, 'status_label'):
+            self.status_label.setText(text)
+        if "已連線" in text or "已連接" in text:
+            self.action_btn.setText("斷開連線")
+            try:
+                self.action_btn.clicked.disconnect()
+            except Exception:
+                pass
+            self.action_btn.clicked.connect(self._disconnect_network)
+            
+    def _show_error(self, err: str):
+        from PyQt5.QtWidgets import QMessageBox
+        QMessageBox.warning(self, "聯彈錯誤", err)
+        self._on_mode_changed()
+
+    def _update_ranges(self):
+        local = set()
+        if self.local_low.isChecked(): local.add('low')
+        if self.local_mid.isChecked(): local.add('mid')
+        if self.local_high.isChecked(): local.add('high')
+        
+        remote = set()
+        if self.remote_low.isChecked(): remote.add('low')
+        if self.remote_mid.isChecked(): remote.add('mid')
+        if self.remote_high.isChecked(): remote.add('high')
+        
+        self.main_window._local_play_ranges = local
+        self.main_window._remote_play_ranges = remote
+        
+        # 若播放器執行中，即時同步音域
+        if self.main_window._player.isRunning():
+            self.main_window._player.set_playback_ranges(local, remote)
+
+
 class SettingsDialog(QDialog):
     """快捷鍵與系統設定對話框。"""
 
@@ -415,6 +646,17 @@ class MainWindow(QWidget):
         self._hotkey_manager = HotkeyManager(self)
         self._player = PlayerThread(self)
 
+        # ── 網路聯彈 ──
+        from core.network_sync import NetworkSyncManager
+        from core.player import SlaveKeyExecutor
+        self._network_manager = NetworkSyncManager(self)
+        self._slave_executor = SlaveKeyExecutor(self)
+        self._slave_executor.start()
+        
+        # 預設演奏範圍：本地彈奏中高音，被控端彈奏低音
+        self._local_play_ranges = {'mid', 'high'}
+        self._remote_play_ranges = {'low'}
+
         # ── 曲目列表 ──
         import sys
         if getattr(sys, 'frozen', False):
@@ -476,6 +718,13 @@ class MainWindow(QWidget):
         title_layout.addWidget(version_label)
 
         title_layout.addStretch()
+
+        self._network_btn = QPushButton()
+        self._network_btn.setObjectName("WinBtn")
+        self._network_btn.setToolTip("網路雙人聯彈")
+        self._network_btn.setIcon(IconFactory.create_icon("network", QColor(94, 94, 94)))
+        self._network_btn.clicked.connect(self._open_network_duet)
+        title_layout.addWidget(self._network_btn)
 
         settings_btn = QPushButton()
         settings_btn.setObjectName("WinBtn")
@@ -771,6 +1020,11 @@ class MainWindow(QWidget):
         self._hotkey_manager.next_track_triggered.connect(self._next_track)
         self._hotkey_manager.prev_track_triggered.connect(self._prev_track)
         self._hotkey_manager.force_stop_triggered.connect(self._force_stop)
+
+        # 網路聯彈信號
+        self._network_manager.command_received.connect(self._slave_executor.queue_cmd)
+        self._network_manager.connection_established.connect(self._on_connection_established)
+        self._network_manager.disconnected.connect(self._on_disconnected)
 
     # ═══════════════════ 曲目管理 ═══════════════════
 
@@ -1315,6 +1569,10 @@ class MainWindow(QWidget):
         """關閉視窗前的清理工作。"""
         self._force_stop()
         self._hotkey_manager.unregister_all()
+        # ── 網路清理 ──
+        self._network_manager.disconnect_all()
+        self._slave_executor.stop()
+        self._slave_executor.wait()
         QApplication.quit()
 
     def closeEvent(self, event) -> None:
@@ -1359,3 +1617,24 @@ class MainWindow(QWidget):
                 self._update_dlg.exec_()
             else:
                 webbrowser.open(release_url)
+
+    def _open_network_duet(self) -> None:
+        """開啟網路聯彈對話框。"""
+        dialog = NetworkDuetDialog(self._network_manager, self)
+        dialog.exec_()
+
+    @pyqtSlot(str, bool)
+    def _on_connection_established(self, peer_ip: str, is_master: bool) -> None:
+        """網路連線建立後的設定。"""
+        if is_master:
+            self._player.set_network_send_callback(self._network_manager.send_cmd)
+            self._player.set_playback_ranges(self._local_play_ranges, self._remote_play_ranges)
+        else:
+            self._player.set_network_send_callback(None)
+            self._player.set_playback_ranges(set(), {'low', 'mid', 'high'})
+
+    @pyqtSlot()
+    def _on_disconnected(self) -> None:
+        """斷開連線後的還原設定。"""
+        self._player.set_network_send_callback(None)
+        self._player.set_playback_ranges({'low', 'mid', 'high'}, set())

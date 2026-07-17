@@ -16,6 +16,10 @@ from core.key_simulator import (
 )
 from core.midi_parser import ParsedMidi, KeyEvent
 
+LOW_KEYS = {'Z', 'X', 'C', 'V', 'B', 'N', 'M'}
+MID_KEYS = {'A', 'S', 'D', 'F', 'G', 'H', 'J'}
+HIGH_KEYS = {'Q', 'W', 'E', 'R', 'T', 'Y', 'U'}
+
 
 class PlaybackState:
     IDLE = "idle"
@@ -45,6 +49,9 @@ class PlayerThread(QThread):
         self._instrument_mode = "lyre"  # 'lyre' 或 'horn'
         self._velocity_dynamics = True   # 力度動態演奏
         self._active_keys: set[str] = set()
+        self._send_callback = None
+        self._local_play_ranges = {'low', 'mid', 'high'}
+        self._remote_play_ranges = set()
 
     def set_midi_data(self, midi_data: ParsedMidi) -> None:
         self._midi_data = midi_data
@@ -60,6 +67,15 @@ class PlayerThread(QThread):
     def set_velocity_dynamics(self, enabled: bool) -> None:
         """設定是否啟用力度動態演奏。"""
         self._velocity_dynamics = enabled
+
+    def set_network_send_callback(self, callback) -> None:
+        """設定網路傳送鍵盤事件的呼叫。"""
+        self._send_callback = callback
+
+    def set_playback_ranges(self, local_ranges: set, remote_ranges: set) -> None:
+        """設定本地與遠端播放的音域範圍 (包含 'low', 'mid', 'high')。"""
+        self._local_play_ranges = local_ranges
+        self._remote_play_ranges = remote_ranges
 
     def play(self) -> None:
         self._is_playing = True
@@ -88,6 +104,8 @@ class PlayerThread(QThread):
 
     def _release_all_active_keys(self) -> None:
         """安全釋放所有目前按下的按鍵，避免卡死。"""
+        if self._send_callback:
+            self._send_callback({"action": "release_all"})
         for key_char in list(self._active_keys):
             scan_code = SCAN_CODES.get(key_char.upper())
             if scan_code is not None:
@@ -168,10 +186,46 @@ class PlayerThread(QThread):
                 else:
                     current_keys = [k.upper() for k in event.keys]
 
-                # ── 執行按鍵邏輯 ──
+                # ── 篩選本地與遠端按鍵 ──
+                local_keys = []
+                remote_keys = []
+                for k in current_keys:
+                    # 判斷是否為遠端
+                    is_remote = False
+                    if k in LOW_KEYS and 'low' in self._remote_play_ranges:
+                        is_remote = True
+                    elif k in MID_KEYS and 'mid' in self._remote_play_ranges:
+                        is_remote = True
+                    elif k in HIGH_KEYS and 'high' in self._remote_play_ranges:
+                        is_remote = True
+                        
+                    # 判斷是否為本地
+                    is_local = False
+                    if k in LOW_KEYS and 'low' in self._local_play_ranges:
+                        is_local = True
+                    elif k in MID_KEYS and 'mid' in self._local_play_ranges:
+                        is_local = True
+                    elif k in HIGH_KEYS and 'high' in self._local_play_ranges:
+                        is_local = True
+                        
+                    if is_remote:
+                        remote_keys.append(k)
+                    if is_local:
+                        local_keys.append(k)
+
+                # 發送遠端按鍵事件
+                if self._send_callback and remote_keys:
+                    self._send_callback({
+                        "action": event.action,
+                        "keys": remote_keys,
+                        "velocity": event.velocity,
+                        "instrument": self._instrument_mode
+                    })
+
+                # ── 執行本地按鍵邏輯 ──
                 if self._instrument_mode == 'horn':
                     # 圓號模式：真實按壓與釋放
-                    for key_char in current_keys:
+                    for key_char in local_keys:
                         scan_code = SCAN_CODES.get(key_char)
                         if scan_code is not None:
                             if event.action == 'press':
@@ -182,7 +236,7 @@ class PlayerThread(QThread):
                                 self._active_keys.discard(key_char)
                 else:
                     # 詩琴模式：只在按下時觸發一次短點擊
-                    if event.action == 'press':
+                    if event.action == 'press' and local_keys:
                         # 力度動態演奏：根據 velocity 縮放按壓時長
                         if self._velocity_dynamics and event.velocity > 0:
                             vel_scale = event.velocity / 127.0  # 0.0 ~ 1.0
@@ -192,10 +246,10 @@ class PlayerThread(QThread):
                             dyn_min = self._delay_min
                             dyn_max = self._delay_max
                         
-                        if len(current_keys) == 1:
-                            press_and_release(current_keys[0], dyn_min, dyn_max)
+                        if len(local_keys) == 1:
+                            press_and_release(local_keys[0], dyn_min, dyn_max)
                         else:
-                            press_multiple_keys(current_keys, dyn_min, dyn_max)
+                            press_multiple_keys(local_keys, dyn_min, dyn_max)
 
                 # ── 發射信號更新 UI ──
                 if event.action == 'press':
@@ -212,3 +266,74 @@ class PlayerThread(QThread):
         self._is_stopped = True
         self.state_changed.emit(PlaybackState.STOPPED)
         self.playback_finished.emit()
+
+
+class SlaveKeyExecutor(QThread):
+    """被控端執行按鍵模擬的背景執行緒，防 UI 執行緒卡死"""
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        import queue
+        self.queue = queue.Queue()
+        self.running = True
+        self._active_keys = set()
+        self._delay_min = 0.02
+        self._delay_max = 0.05
+
+    def set_delay(self, delay_min: float, delay_max: float):
+        self._delay_min = delay_min
+        self._delay_max = delay_max
+
+    def queue_cmd(self, cmd: dict):
+        self.queue.put(cmd)
+
+    def run(self):
+        import queue
+        import time
+        while self.running:
+            try:
+                cmd = self.queue.get(timeout=0.1)
+            except queue.Empty:
+                continue
+                
+            action = cmd.get("action")
+            keys = cmd.get("keys", [])
+            velocity = cmd.get("velocity", 100)
+            instrument = cmd.get("instrument", "lyre")
+            
+            if action == "release_all":
+                self._release_all()
+                self.queue.task_done()
+                continue
+                
+            if instrument == "horn":
+                for key_char in keys:
+                    scan_code = SCAN_CODES.get(key_char.upper())
+                    if scan_code is not None:
+                        if action == "press":
+                            press_key(scan_code)
+                            self._active_keys.add(key_char.upper())
+                        elif action == "release":
+                            release_key(scan_code)
+                            self._active_keys.discard(key_char.upper())
+            else:
+                if action == "press" and keys:
+                    dyn_min = self._delay_min
+                    dyn_max = self._delay_max
+                    if len(keys) == 1:
+                        press_and_release(keys[0].upper(), dyn_min, dyn_max)
+                    else:
+                        press_multiple_keys([k.upper() for k in keys], dyn_min, dyn_max)
+            
+            self.queue.task_done()
+            
+        self._release_all()
+
+    def _release_all(self):
+        for key_char in list(self._active_keys):
+            scan_code = SCAN_CODES.get(key_char)
+            if scan_code is not None:
+                release_key(scan_code)
+        self._active_keys.clear()
+
+    def stop(self):
+        self.running = False
