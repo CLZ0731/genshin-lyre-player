@@ -198,7 +198,7 @@ class UpdateProgressDialog(QDialog):
             self._on_error(f"解壓縮失敗: {e}")
             return
             
-        current_app_dir = os.path.dirname(sys.executable) if getattr(sys, 'frozen', False) else os.path.dirname(os.path.abspath(__file__))
+        current_app_dir = os.path.dirname(sys.executable) if getattr(sys, 'frozen', False) else os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
         
         # 產生更新用的暫存批次檔
         bat_content = f"""@echo off
