@@ -80,6 +80,11 @@ class ServerThread(QThread):
 
     def stop(self):
         self.running = False
+        if self.server_socket:
+            try:
+                self.server_socket.close()
+            except Exception:
+                pass
 
 
 class ReceiverThread(QThread):
@@ -131,15 +136,23 @@ class ClientConnectThread(QThread):
         super().__init__(parent)
         self.ip = ip
         self.port = port
+        self.conn = None
 
     def run(self):
         try:
-            conn = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-            conn.settimeout(5.0)
-            conn.connect((self.ip, self.port))
-            self.connected.emit(conn, self.ip)
+            self.conn = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            self.conn.settimeout(5.0)
+            self.conn.connect((self.ip, self.port))
+            self.connected.emit(self.conn, self.ip)
         except Exception as e:
             self.failed.emit(str(e))
+
+    def stop(self):
+        if self.conn:
+            try:
+                self.conn.close()
+            except Exception:
+                pass
 
 
 class NetworkSyncManager(QObject):
@@ -240,12 +253,15 @@ class NetworkSyncManager(QObject):
     def disconnect_all(self):
         self.is_connected = False
         
-        if self.server_thread:
-            self.server_thread.stop()
-            self.server_thread.wait()
-            self.server_thread = None
-            
+        if self.conn:
+            try:
+                self.conn.close()
+            except Exception:
+                pass
+            self.conn = None
+
         if self.connect_thread:
+            self.connect_thread.stop()
             self.connect_thread.wait()
             self.connect_thread = None
             
@@ -254,9 +270,7 @@ class NetworkSyncManager(QObject):
             self.receiver_thread.wait()
             self.receiver_thread = None
             
-        if self.conn:
-            try:
-                self.conn.close()
-            except Exception:
-                pass
-            self.conn = None
+        if self.server_thread:
+            self.server_thread.stop()
+            self.server_thread.wait()
+            self.server_thread = None
