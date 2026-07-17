@@ -203,9 +203,15 @@ class UpdateProgressDialog(QDialog):
         # 產生更新用的暫存批次檔
         bat_content = f"""@echo off
 echo 正在等待主程式關閉...
-timeout /t 3 /nobreak >nul
+:wait_loop
+tasklist /FI "IMAGENAME eq GenshinLyrePlayer.exe" 2>NUL | find /I /N "GenshinLyrePlayer.exe" >NUL
+if "%ERRORLEVEL%"=="0" (
+    timeout /t 1 /nobreak >nul
+    goto wait_loop
+)
+
 echo 正在替換新版本檔案...
-xcopy /E /Y /Q "{extract_dir}\\*" "{current_app_dir}\\"
+xcopy /E /Y /Q /R /H "{extract_dir}\\*" "{current_app_dir}\\"
 echo 正在重新啟動應用程式...
 start "" "{current_app_dir}\\GenshinLyrePlayer.exe"
 echo 清理暫存檔案...
