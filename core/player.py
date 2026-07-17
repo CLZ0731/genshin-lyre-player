@@ -52,6 +52,7 @@ class PlayerThread(QThread):
         self._send_callback = None
         self._local_play_ranges = {'low', 'mid', 'high'}
         self._remote_play_ranges = set()
+        self._remote_instrument_mode = "follow"  # "follow", "lyre", "horn"
 
     def set_midi_data(self, midi_data: ParsedMidi) -> None:
         self._midi_data = midi_data
@@ -76,6 +77,10 @@ class PlayerThread(QThread):
         """設定本地與遠端播放的音域範圍 (包含 'low', 'mid', 'high')。"""
         self._local_play_ranges = local_ranges
         self._remote_play_ranges = remote_ranges
+
+    def set_remote_instrument_mode(self, mode: str) -> None:
+        """設定遠端（被控端）的樂器模式，可以是 'follow', 'lyre', 'horn'。"""
+        self._remote_instrument_mode = mode
 
     def play(self) -> None:
         self._is_playing = True
@@ -219,7 +224,7 @@ class PlayerThread(QThread):
                         "action": event.action,
                         "keys": remote_keys,
                         "velocity": event.velocity,
-                        "instrument": self._instrument_mode
+                        "instrument": self._remote_instrument_mode
                     })
 
                 # ── 執行本地按鍵邏輯 ──
@@ -278,10 +283,15 @@ class SlaveKeyExecutor(QThread):
         self._active_keys = set()
         self._delay_min = 0.02
         self._delay_max = 0.05
+        self._instrument_mode = "lyre"  # 'lyre' 或 'horn'
 
     def set_delay(self, delay_min: float, delay_max: float):
         self._delay_min = delay_min
         self._delay_max = delay_max
+
+    def set_instrument_mode(self, mode: str):
+        """設定本地被控端的樂器模式 ('lyre' 詩琴 或 'horn' 圓號)。"""
+        self._instrument_mode = mode
 
     def queue_cmd(self, cmd: dict):
         self.queue.put(cmd)
@@ -298,7 +308,13 @@ class SlaveKeyExecutor(QThread):
             action = cmd.get("action")
             keys = cmd.get("keys", [])
             velocity = cmd.get("velocity", 100)
-            instrument = cmd.get("instrument", "lyre")
+            remote_inst = cmd.get("instrument", "follow")
+            
+            # 若主控端強制指定樂器，則使用指定樂器；否則使用被控端本地下拉選單設定的樂器
+            if remote_inst in ("lyre", "horn"):
+                instrument = remote_inst
+            else:
+                instrument = self._instrument_mode
             
             if action == "release_all":
                 self._release_all()

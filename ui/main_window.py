@@ -304,7 +304,7 @@ class NetworkDuetDialog(QDialog):
         super().__init__(parent)
         self.manager = manager
         self.setWindowTitle("網路雙人聯彈設定")
-        self.setFixedSize(400, 380)
+        self.setFixedSize(400, 415)
         self.setStyleSheet(MAIN_STYLESHEET)
         
         # 保存主視窗參考以更新播放音域
@@ -457,6 +457,14 @@ class NetworkDuetDialog(QDialog):
         config_layout.addWidget(self.remote_low, 1, 1)
         config_layout.addWidget(self.remote_mid, 1, 2)
         config_layout.addWidget(self.remote_high, 1, 3)
+
+        config_layout.addWidget(QLabel("被控端樂器:"), 2, 0)
+        self.remote_inst_combo = QComboBox()
+        self.remote_inst_combo.addItems(["跟隨被控端設定", "強制詩琴 (短音)", "強制圓號 (長音)"])
+        override_map = {"follow": 0, "lyre": 1, "horn": 2}
+        self.remote_inst_combo.setCurrentIndex(override_map.get(self.main_window._remote_instrument_override, 0))
+        self.remote_inst_combo.currentIndexChanged.connect(self._on_remote_inst_changed)
+        config_layout.addWidget(self.remote_inst_combo, 2, 1, 1, 3)
         
         # 載入目前的音域配置
         self.local_low.setChecked('low' in self.main_window._local_play_ranges)
@@ -527,6 +535,12 @@ class NetworkDuetDialog(QDialog):
         # 若播放器執行中，即時同步音域
         if self.main_window._player.isRunning():
             self.main_window._player.set_playback_ranges(local, remote)
+
+    def _on_remote_inst_changed(self, index: int):
+        override_map = {0: "follow", 1: "lyre", 2: "horn"}
+        val = override_map.get(index, "follow")
+        self.main_window._remote_instrument_override = val
+        self.main_window._player.set_remote_instrument_mode(val)
 
 
 class SettingsDialog(QDialog):
@@ -656,6 +670,7 @@ class MainWindow(QWidget):
         # 預設演奏範圍：本地彈奏中高音，被控端彈奏低音
         self._local_play_ranges = {'mid', 'high'}
         self._remote_play_ranges = {'low'}
+        self._remote_instrument_override = "follow"  # 預設被控端樂器跟隨被控端自己的設定
 
         # ── 曲目列表 ──
         import sys
@@ -1023,6 +1038,7 @@ class MainWindow(QWidget):
 
         # 網路聯彈信號
         self._network_manager.command_received.connect(self._slave_executor.queue_cmd)
+        self._network_manager.command_received.connect(self._on_network_command_received)
         self._network_manager.connection_established.connect(self._on_connection_established)
         self._network_manager.disconnected.connect(self._on_disconnected)
 
@@ -1348,6 +1364,7 @@ class MainWindow(QWidget):
         """切換樂器模式。"""
         mode = "lyre" if index == 0 else "horn"
         self._player.set_instrument_mode(mode)
+        self._slave_executor.set_instrument_mode(mode)
 
     # ═══════════════════ 播放控制 ═══════════════════
 
@@ -1629,12 +1646,29 @@ class MainWindow(QWidget):
         if is_master:
             self._player.set_network_send_callback(self._network_manager.send_cmd)
             self._player.set_playback_ranges(self._local_play_ranges, self._remote_play_ranges)
+            self._player.set_remote_instrument_mode(self._remote_instrument_override)
         else:
             self._player.set_network_send_callback(None)
             self._player.set_playback_ranges(set(), {'low', 'mid', 'high'})
+            self._status_label.setText("連線成功 (被控端模式)")
 
     @pyqtSlot()
     def _on_disconnected(self) -> None:
         """斷開連線後的還原設定。"""
         self._player.set_network_send_callback(None)
         self._player.set_playback_ranges({'low', 'mid', 'high'}, set())
+        self._note_display.setText("--")
+        self._status_label.setText("就緒")
+
+    @pyqtSlot(dict)
+    def _on_network_command_received(self, cmd: dict) -> None:
+        """被控端接收到遠端播放命令時，更新本機 UI 顯示。"""
+        action = cmd.get("action")
+        keys = cmd.get("keys", [])
+        if action == "press" and keys:
+            key_str = "+".join(keys)
+            self._note_display.setText(key_str)
+            self._status_label.setText("同步演奏中...")
+        elif action == "release_all":
+            self._note_display.setText("--")
+            self._status_label.setText("連線成功 (被控模式)")
