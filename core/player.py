@@ -54,9 +54,13 @@ class PlayerThread(QThread):
         self._remote_play_ranges = set()
         self._remote_instrument_mode = "follow"  # "follow", "lyre", "horn"
         self._target_hwnd = None
+        self._target_hwnd2 = None
 
     def set_target_hwnd(self, hwnd: int | None) -> None:
         self._target_hwnd = hwnd
+
+    def set_target_hwnd2(self, hwnd: int | None) -> None:
+        self._target_hwnd2 = hwnd
 
     def set_midi_data(self, midi_data: ParsedMidi) -> None:
         self._midi_data = midi_data
@@ -119,6 +123,8 @@ class PlayerThread(QThread):
             scan_code = SCAN_CODES.get(key_char.upper())
             if scan_code is not None:
                 release_key(scan_code, self._target_hwnd, key_char)
+                if self._target_hwnd2:
+                    release_key(scan_code, self._target_hwnd2, key_char)
         self._active_keys.clear()
 
     @property
@@ -222,8 +228,8 @@ class PlayerThread(QThread):
                     if is_local:
                         local_keys.append(k)
 
-                # 發送遠端按鍵事件
-                if self._send_callback and remote_keys:
+                # 發送遠端按鍵事件 (只在沒有設定第二目標視窗時，才走網路連線模式，避免衝突)
+                if not self._target_hwnd2 and self._send_callback and remote_keys:
                     self._send_callback({
                         "action": event.action,
                         "keys": remote_keys,
@@ -259,6 +265,42 @@ class PlayerThread(QThread):
                             press_and_release(local_keys[0], dyn_min, dyn_max, self._target_hwnd)
                         else:
                             press_multiple_keys(local_keys, dyn_min, dyn_max, self._target_hwnd)
+
+                # ── 執行協同視窗 (第二視窗) 按鍵邏輯 ──
+                if self._target_hwnd2 and remote_keys:
+                    second_inst_mode = self._remote_instrument_mode
+                    if second_inst_mode == 'follow':
+                        second_inst_mode = self._instrument_mode
+                        
+                    if second_inst_mode == 'horn':
+                        # 圓號模式：真實按壓與釋放 (只對非低音有效，因為圓號沒有低音區)
+                        # 晚風圓號只有中音與高音，忽略低音(Z~M)
+                        filtered_remote = [rk for rk in remote_keys if rk not in ('Z','X','C','V','B','N','M')]
+                        for key_char in filtered_remote:
+                            scan_code = SCAN_CODES.get(key_char)
+                            if scan_code is not None:
+                                if event.action == 'press':
+                                    press_key(scan_code, self._target_hwnd2, key_char)
+                                    self._active_keys.add(key_char)
+                                elif event.action == 'release':
+                                    release_key(scan_code, self._target_hwnd2, key_char)
+                                    self._active_keys.discard(key_char)
+                    else:
+                        # 詩琴模式：只在按下時觸發一次短點擊
+                        if event.action == 'press':
+                            # 力度動態演奏：根據 velocity 縮放按壓時長
+                            if self._velocity_dynamics and event.velocity > 0:
+                                vel_scale = event.velocity / 127.0
+                                dyn_min = self._delay_min * (0.4 + 0.6 * vel_scale)
+                                dyn_max = self._delay_max * (0.4 + 0.6 * vel_scale)
+                            else:
+                                dyn_min = self._delay_min
+                                dyn_max = self._delay_max
+                                
+                            if len(remote_keys) == 1:
+                                press_and_release(remote_keys[0], dyn_min, dyn_max, self._target_hwnd2)
+                            else:
+                                press_multiple_keys(remote_keys, dyn_min, dyn_max, self._target_hwnd2)
 
                 # ── 發射信號更新 UI ──
                 if event.action == 'press':

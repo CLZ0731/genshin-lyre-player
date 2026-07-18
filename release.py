@@ -17,10 +17,10 @@ if not TOKEN:
 
 OWNER = "CLZ0731"
 REPO = "genshin-lyre-player"
-TAG_NAME = "v1.11.0"
-MSI_FILE = r"dist\GenshinLyrePlayer-1.11.0-win64.msi"
+TAG_NAME = "v1.12.0"
+MSI_FILE = r"dist\GenshinLyrePlayer-1.12.0-win64.msi"
 PORTABLE_DIR = r"build\exe.win-amd64-3.12"
-ZIP_FILE = r"dist\GenshinLyrePlayer-1.11.0-portable.zip"
+ZIP_FILE = r"dist\GenshinLyrePlayer-1.12.0-portable.zip"
 
 def make_request(url, headers, method="GET", payload=None, data=None):
     if payload:
@@ -49,7 +49,7 @@ def create_release():
     payload = {
         "tag_name": TAG_NAME,
         "name": f"Genshin Lyre Player {TAG_NAME}",
-        "body": "## 更新內容\n- **修復模擬器與後台視窗按鍵失效 Bug**：\n  - **增加 WM_ACTIVATE 與 WM_SETFOCUS 注入**：每次發送後台按鍵前，自動向目標視窗的訊息佇列發送視窗啟用與聚焦訊號，解決了部分模擬器在後台或失去焦點時，會主動丟棄 PostMessage 按鍵訊息的問題。\n  - **更廣泛的模擬器渲染子視窗偵測**：針對如 BlueStacks 等基於 Qt5/Qt6 且沒有專門 Render 類名的模擬器，新增了遞迴尋找 Qt 渲染子視窗並對齊對應 HWND 的邏輯，大幅提升對 BlueStacks 等模擬器的背景播放相容性！\n  - 現在，您可以將 PC 版原神保持在前景 (由於 PC 遊戲本身會透過 API 強行檢測 GetForegroundWindow 焦點，故 PC 版必須聚焦)，而將**安卓模擬器丟到背景**，兩者即能同時響應按鍵完美彈奏！",
+        "body": "## 更新內容\n- **新增單一程式「雙目標視窗」同步演奏功能（無延遲雙開聯彈）**：\n  - **主介面直接選取雙視窗**：現在不需要開啟兩個程式並用網路配對碼連線了！主介面直接新增「主控視窗」與「協同視窗」兩個下拉選單。\n  - **視覺化音域分配**：主控視窗與協同視窗右側皆新增「低/中/高」音域勾選框。您可以自由指定哪一區音軌在主控視窗（如 PC 原神）彈奏，哪一區音軌在協同視窗（如安卓模擬器）彈奏！\n  - **完美解決延遲與操作繁瑣問題**：完全消除了網路通訊帶來的任何微小延遲。同時只須執行一個軟體即可直接控制兩個遊戲客戶端，體驗極致流暢的二重奏！",
         "draft": False,
         "prerelease": False
     }

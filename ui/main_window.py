@@ -650,8 +650,8 @@ class MainWindow(QWidget):
         )
         self.setObjectName("MainWindow")
         self.setAttribute(Qt.WA_TranslucentBackground)
-        self.setMinimumSize(440, 560)
-        self.resize(480, 580)
+        self.setMinimumSize(440, 595)
+        self.resize(480, 615)
         self.setMouseTracking(True)
 
         # ── 拖曳與縮放狀態 ──
@@ -920,30 +920,92 @@ class MainWindow(QWidget):
         params_row2.addStretch()
         params_panel_layout.addLayout(params_row2)
 
-        # 第三列：目標視窗
+        # 第三列：目標視窗 1
         params_row3 = QHBoxLayout()
         params_row3.setSpacing(8)
 
-        target_label = QLabel("目標視窗")
+        target_label = QLabel("主控視窗")
         target_label.setObjectName("ParamLabel")
-        target_label.setToolTip("選擇按鍵發送的目的遊戲視窗，支援背景模擬")
+        target_label.setToolTip("第一目標遊戲視窗，通常是前景的 PC 版原神")
         params_row3.addWidget(target_label)
 
         self._target_hwnd_combo = QComboBox()
-        self._target_hwnd_combo.setMinimumWidth(220)
-        self._target_hwnd_combo.setToolTip("「前景視窗」即為傳統模式，特定視窗為背景模擬模式（適合開多個遊戲）")
+        self._target_hwnd_combo.setMinimumWidth(180)
+        self._target_hwnd_combo.setToolTip("第一個遊戲視窗的控制代碼")
         self._target_hwnd_combo.currentIndexChanged.connect(self._on_target_hwnd_changed)
         params_row3.addWidget(self._target_hwnd_combo)
 
+        # 重新整理按鈕
         self._refresh_windows_btn = QPushButton()
         self._refresh_windows_btn.setObjectName("ToolBtn")
-        self._refresh_windows_btn.setToolTip("重新掃描原神視窗")
+        self._refresh_windows_btn.setToolTip("重新掃描原神與模擬器視窗")
         self._refresh_windows_btn.setIcon(IconFactory.create_icon("refresh", QColor(0, 0, 0)))
         self._refresh_windows_btn.clicked.connect(self._refresh_genshin_windows)
         params_row3.addWidget(self._refresh_windows_btn)
 
+        params_row3.addSpacing(6)
+
+        # 視窗 1 音域選擇
+        self._w1_low_cb = QCheckBox("低")
+        self._w1_low_cb.setChecked(True)
+        self._w1_low_cb.setToolTip("主控視窗演奏低音區")
+        self._w1_low_cb.stateChanged.connect(self._update_playback_ranges)
+        params_row3.addWidget(self._w1_low_cb)
+
+        self._w1_mid_cb = QCheckBox("中")
+        self._w1_mid_cb.setChecked(True)
+        self._w1_mid_cb.setToolTip("主控視窗演奏中音區")
+        self._w1_mid_cb.stateChanged.connect(self._update_playback_ranges)
+        params_row3.addWidget(self._w1_mid_cb)
+
+        self._w1_high_cb = QCheckBox("高")
+        self._w1_high_cb.setChecked(True)
+        self._w1_high_cb.setToolTip("主控視窗演奏高音區")
+        self._w1_high_cb.stateChanged.connect(self._update_playback_ranges)
+        params_row3.addWidget(self._w1_high_cb)
+
         params_row3.addStretch()
         params_panel_layout.addLayout(params_row3)
+
+        # 第四列：目標視窗 2 (協同/雙開伴奏)
+        params_row4 = QHBoxLayout()
+        params_row4.setSpacing(8)
+
+        target2_label = QLabel("協同視窗")
+        target2_label.setObjectName("ParamLabel")
+        target2_label.setToolTip("第二目標遊戲視窗，通常是背景的手機版模擬器")
+        params_row4.addWidget(target2_label)
+
+        self._target_hwnd_combo2 = QComboBox()
+        self._target_hwnd_combo2.setMinimumWidth(180)
+        self._target_hwnd_combo2.setToolTip("第二個遊戲視窗的控制代碼，設為未設定則停用雙開同步模式")
+        self._target_hwnd_combo2.currentIndexChanged.connect(self._on_target_hwnd2_changed)
+        params_row4.addWidget(self._target_hwnd_combo2)
+
+        # 為了排版對齊，放一個空白占位 spacer
+        params_row4.addSpacing(34)
+
+        # 視窗 2 音域選擇
+        self._w2_low_cb = QCheckBox("低")
+        self._w2_low_cb.setChecked(False)
+        self._w2_low_cb.setToolTip("協同視窗演奏低音區")
+        self._w2_low_cb.stateChanged.connect(self._update_playback_ranges)
+        params_row4.addWidget(self._w2_low_cb)
+
+        self._w2_mid_cb = QCheckBox("中")
+        self._w2_mid_cb.setChecked(False)
+        self._w2_mid_cb.setToolTip("協同視窗演奏中音區")
+        self._w2_mid_cb.stateChanged.connect(self._update_playback_ranges)
+        params_row4.addWidget(self._w2_mid_cb)
+
+        self._w2_high_cb = QCheckBox("高")
+        self._w2_high_cb.setChecked(False)
+        self._w2_high_cb.setToolTip("協同視窗演奏高音區")
+        self._w2_high_cb.stateChanged.connect(self._update_playback_ranges)
+        params_row4.addWidget(self._w2_high_cb)
+
+        params_row4.addStretch()
+        params_panel_layout.addLayout(params_row4)
 
         main_layout.addWidget(params_panel)
 
@@ -1290,7 +1352,14 @@ class MainWindow(QWidget):
         self._instrument_combo.setEnabled(enabled)
         self._track_btn.setEnabled(enabled)
         self._target_hwnd_combo.setEnabled(enabled)
+        self._target_hwnd_combo2.setEnabled(enabled)
         self._refresh_windows_btn.setEnabled(enabled)
+        self._w1_low_cb.setEnabled(enabled)
+        self._w1_mid_cb.setEnabled(enabled)
+        self._w1_high_cb.setEnabled(enabled)
+        self._w2_low_cb.setEnabled(enabled)
+        self._w2_mid_cb.setEnabled(enabled)
+        self._w2_high_cb.setEnabled(enabled)
 
     @pyqtSlot(str)
     def _on_transcribe_success(self, midi_path: str) -> None:
@@ -1343,27 +1412,34 @@ class MainWindow(QWidget):
         self._player.set_velocity_dynamics(self._velocity_cb.isChecked())
 
     def _refresh_genshin_windows(self) -> None:
-        """掃描系統中的原神遊戲視窗並填入下拉選單。"""
+        """掃描系統中的原神與模擬器視窗並填入下拉選單。"""
         from core.key_simulator import get_genshin_windows
         
         self._target_hwnd_combo.blockSignals(True)
         self._target_hwnd_combo.clear()
-        
-        # 預設項：前景活動視窗 (SendInput)
         self._target_hwnd_combo.addItem("活動視窗 (前景 / SendInput)", None)
         
-        # 掃描原神視窗
+        self._target_hwnd_combo2.blockSignals(True)
+        self._target_hwnd_combo2.clear()
+        self._target_hwnd_combo2.addItem("未設定 (停用雙開)", None)
+        
+        # 掃描視窗
         windows = get_genshin_windows()
         for hwnd, title in windows:
             self._target_hwnd_combo.addItem(title, hwnd)
+            self._target_hwnd_combo2.addItem(title, hwnd)
             
         self._target_hwnd_combo.blockSignals(False)
+        self._target_hwnd_combo2.blockSignals(False)
+        
         self._target_hwnd_combo.setCurrentIndex(0)
+        self._target_hwnd_combo2.setCurrentIndex(0)
         self._on_target_hwnd_changed(0)
+        self._on_target_hwnd2_changed(0)
 
     @pyqtSlot(int)
     def _on_target_hwnd_changed(self, index: int) -> None:
-        """當選取的目標遊戲視窗改變時。"""
+        """當選取的主控遊戲視窗改變時。"""
         hwnd = self._target_hwnd_combo.currentData()
         if hwnd:
             # 獲取實際輸入視窗（若為模擬器會自動轉換為內部子視窗）
@@ -1371,11 +1447,45 @@ class MainWindow(QWidget):
             actual_hwnd = get_input_target_hwnd(hwnd)
             self._player.set_target_hwnd(actual_hwnd)
             self._slave_executor.set_target_hwnd(actual_hwnd)
-            print(f"[目標視窗] 已切換至特定視窗 (HWND: {hwnd} -> 實際輸入 HWND: {actual_hwnd})，啟用背景模擬模式")
+            print(f"[主控視窗] 已切換至特定視窗 (HWND: {hwnd} -> 實際輸入 HWND: {actual_hwnd})，啟用背景模擬模式")
         else:
             self._player.set_target_hwnd(None)
             self._slave_executor.set_target_hwnd(None)
-            print("[目標視窗] 已切換至活動視窗，使用傳統前景 SendInput 模式")
+            print("[主控視窗] 已切換至活動視窗，使用傳統前景 SendInput 模式")
+        self._update_playback_ranges()
+
+    @pyqtSlot(int)
+    def _on_target_hwnd2_changed(self, index: int) -> None:
+        """當選取的協同遊戲視窗改變時。"""
+        hwnd2 = self._target_hwnd_combo2.currentData()
+        if hwnd2:
+            # 獲取實際輸入視窗（若為模擬器會自動轉換為內部子視窗）
+            from core.key_simulator import get_input_target_hwnd
+            actual_hwnd2 = get_input_target_hwnd(hwnd2)
+            self._player.set_target_hwnd2(actual_hwnd2)
+            print(f"[協同視窗] 已切換至特定視窗 (HWND: {hwnd2} -> 實際輸入 HWND: {actual_hwnd2})，啟用雙開同步演奏")
+        else:
+            self._player.set_target_hwnd2(None)
+            print("[協同視窗] 已設為未指定，關閉雙開同步演奏")
+        self._update_playback_ranges()
+
+    def _update_playback_ranges(self) -> None:
+        """根據介面勾選的音域，更新播放器主/協同視窗的播放音域。"""
+        # 由於這是一個防爆保護，未初始化時直接回傳
+        if not hasattr(self, "_w1_low_cb"):
+            return
+            
+        w1_ranges = set()
+        if self._w1_low_cb.isChecked(): w1_ranges.add('low')
+        if self._w1_mid_cb.isChecked(): w1_ranges.add('mid')
+        if self._w1_high_cb.isChecked(): w1_ranges.add('high')
+        
+        w2_ranges = set()
+        if self._w2_low_cb.isChecked(): w2_ranges.add('low')
+        if self._w2_mid_cb.isChecked(): w2_ranges.add('mid')
+        if self._w2_high_cb.isChecked(): w2_ranges.add('high')
+        
+        self._player.set_playback_ranges(w1_ranges, w2_ranges)
 
     @pyqtSlot(int)
     def _on_track_changed(self, index: int) -> None:
@@ -1508,12 +1618,26 @@ class MainWindow(QWidget):
             self._play_btn.setText("  暫停")
             self._play_btn.setIcon(IconFactory.create_icon("pause", QColor(255, 255, 255)))
             self._target_hwnd_combo.setEnabled(False)
+            self._target_hwnd_combo2.setEnabled(False)
             self._refresh_windows_btn.setEnabled(False)
+            self._w1_low_cb.setEnabled(False)
+            self._w1_mid_cb.setEnabled(False)
+            self._w1_high_cb.setEnabled(False)
+            self._w2_low_cb.setEnabled(False)
+            self._w2_mid_cb.setEnabled(False)
+            self._w2_high_cb.setEnabled(False)
         else:
             self._play_btn.setText("  播放")
             self._play_btn.setIcon(IconFactory.create_icon("play", QColor(255, 255, 255)))
             self._target_hwnd_combo.setEnabled(True)
+            self._target_hwnd_combo2.setEnabled(True)
             self._refresh_windows_btn.setEnabled(True)
+            self._w1_low_cb.setEnabled(True)
+            self._w1_mid_cb.setEnabled(True)
+            self._w1_high_cb.setEnabled(True)
+            self._w2_low_cb.setEnabled(True)
+            self._w2_mid_cb.setEnabled(True)
+            self._w2_high_cb.setEnabled(True)
 
     @pyqtSlot(int, int)
     def _on_progress_updated(self, current: int, total: int) -> None:
