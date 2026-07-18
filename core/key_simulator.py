@@ -104,6 +104,9 @@ def press_key(scan_code: int, hwnd: int | None = None, key_char: str | None = No
         if key_char:
             vk = ord(key_char.upper())
             lParam = 1 | (scan_code << 16)
+            # 傳送啟用與聚焦訊息，欺騙視窗使其在背景也能正常處理按鍵
+            ctypes.windll.user32.PostMessageW(hwnd, 0x0006, 1, 0)  # WM_ACTIVATE = 0x0006, WA_ACTIVE = 1
+            ctypes.windll.user32.PostMessageW(hwnd, 0x0007, 0, 0)  # WM_SETFOCUS = 0x0007
             ctypes.windll.user32.PostMessageW(hwnd, WM_KEYDOWN, vk, lParam)
     else:
         _send_input(scan_code, KEYEVENTF_SCANCODE)
@@ -115,6 +118,9 @@ def release_key(scan_code: int, hwnd: int | None = None, key_char: str | None = 
         if key_char:
             vk = ord(key_char.upper())
             lParam = 1 | (scan_code << 16) | 0xC0000000
+            # 傳送啟用與聚焦訊息，欺騙視窗使其在背景也能正常處理按鍵
+            ctypes.windll.user32.PostMessageW(hwnd, 0x0006, 1, 0)  # WM_ACTIVATE = 0x0006, WA_ACTIVE = 1
+            ctypes.windll.user32.PostMessageW(hwnd, 0x0007, 0, 0)  # WM_SETFOCUS = 0x0007
             ctypes.windll.user32.PostMessageW(hwnd, WM_KEYUP, vk, lParam)
     else:
         _send_input(scan_code, KEYEVENTF_SCANCODE | KEYEVENTF_KEYUP)
@@ -253,20 +259,34 @@ def get_input_target_hwnd(parent_hwnd: int) -> int:
     
     WNDENUMPROC = ctypes.WINFUNCTYPE(ctypes.c_bool, ctypes.c_void_p, ctypes.c_void_p)
     
-    def enum_child_proc(hwnd, lParam):
+    # 優先尋找明確的渲染類別名
+    def enum_child_proc_priority(hwnd, lParam):
         c_class = ctypes.create_unicode_buffer(256)
         ctypes.windll.user32.GetClassNameW(hwnd, c_class, 256)
         c_class_val = c_class.value
         
-        # 常見模擬器接收輸入的子視窗類名：
-        # - 雷電模擬器: "RenderWindow"
-        # - 夜神模擬器: "ScreenWindow"
-        # - MuMu 模擬器: "SgRenderWindow" 或 "subWin"
+        # 常見模擬器接收輸入的渲染子視窗類名
         if c_class_val in ("RenderWindow", "ScreenWindow", "SgRenderWindow", "subWin"):
             target_child[0] = hwnd
             return False  # 停止尋找
         return True
         
-    callback = WNDENUMPROC(enum_child_proc)
-    ctypes.windll.user32.EnumChildWindows(parent_hwnd, callback, 0)
+    callback_priority = WNDENUMPROC(enum_child_proc_priority)
+    ctypes.windll.user32.EnumChildWindows(parent_hwnd, callback_priority, 0)
+    
+    # 如果沒找到明確的渲染類別，且為 Qt 相關模擬器，則尋找其內部的 Qt 子視窗
+    if target_child[0] == parent_hwnd:
+        def enum_child_proc_qt(hwnd, lParam):
+            c_class = ctypes.create_unicode_buffer(256)
+            ctypes.windll.user32.GetClassNameW(hwnd, c_class, 256)
+            c_class_val = c_class.value
+            
+            if c_class_val in ("Qt5156QWindowIcon", "Qt5QWindowIcon") and hwnd != parent_hwnd:
+                target_child[0] = hwnd
+                return False  # 停止尋找
+            return True
+            
+        callback_qt = WNDENUMPROC(enum_child_proc_qt)
+        ctypes.windll.user32.EnumChildWindows(parent_hwnd, callback_qt, 0)
+        
     return target_child[0]
