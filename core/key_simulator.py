@@ -167,33 +167,106 @@ def press_multiple_keys(key_chars: list[str], delay_min: float = 0.02,
 
 
 def get_genshin_windows() -> list[tuple[int, str]]:
-    """掃描所有原神遊戲視窗，返回 (hwnd, title_with_pid) 列表"""
+    """掃描所有相關視窗（包含原神 PC 版及常見模擬器或所有可見主視窗），返回 (hwnd, title_with_pid) 列表"""
     windows = []
     
-    # 宣告 callback 類型
     WNDENUMPROC = ctypes.WINFUNCTYPE(ctypes.c_bool, ctypes.c_void_p, ctypes.c_void_p)
     
     def enum_window_proc(hwnd, lParam):
-        # 獲取視窗類別名稱
+        # 1. 必須是可見視窗
+        if not ctypes.windll.user32.IsWindowVisible(hwnd):
+            return True
+            
+        # 2. 獲取標題
+        title = ctypes.create_unicode_buffer(512)
+        ctypes.windll.user32.GetWindowTextW(hwnd, title, 512)
+        t_name = title.value.strip()
+        if not t_name:
+            return True
+            
+        # 3. 排除常見的系統視窗
+        ignore_titles = {
+            "Program Manager", "Settings", "Start", "Microsoft Store",
+            "NVIDIA GeForce Overlay", "Windows Input Experience", "taskbar",
+            "Action Center", "Cortana", "搜索", "Search", "工作管理員", "Task Manager"
+        }
+        if t_name in ignore_titles:
+            return True
+            
+        # 4. 獲取類別名稱
         class_name = ctypes.create_unicode_buffer(256)
         ctypes.windll.user32.GetClassNameW(hwnd, class_name, 256)
-        
-        # 獲取視窗標題
-        title = ctypes.create_unicode_buffer(256)
-        ctypes.windll.user32.GetWindowTextW(hwnd, title, 256)
-        
         c_name = class_name.value
-        t_name = title.value
         
-        # 原神遊戲視窗類名為 "UnityWndClass"
-        if c_name == "UnityWndClass" and ("原神" in t_name or "Genshin Impact" in t_name):
-            # 獲取 PID
-            pid = ctypes.c_ulong()
-            ctypes.windll.user32.GetWindowThreadProcessId(hwnd, ctypes.byref(pid))
-            windows.append((hwnd, f"{t_name} (PID: {pid.value})"))
+        # 排除無關的 Windows 內部類別
+        if c_name in ("Windows.UI.Core.CoreWindow", "ApplicationFrameWindow", "Shell_TrayWnd", "IME"):
+            return True
+
+        # 5. 獲取 PID
+        pid = ctypes.c_ulong()
+        ctypes.windll.user32.GetWindowThreadProcessId(hwnd, ctypes.byref(pid))
+        
+        lower_title = t_name.lower()
+        is_game_or_emulator = (
+            c_name == "UnityWndClass" or
+            "原神" in t_name or
+            "genshin" in lower_title or
+            "模擬器" in t_name or
+            "player" in lower_title or
+            "bluestacks" in lower_title or
+            "nox" in lower_title or
+            "mumu" in lower_title or
+            "雷電" in t_name or
+            "夜神" in t_name or
+            "逍遙" in t_name
+        )
+        
+        if is_game_or_emulator:
+            prefix = "🎮 " if ("原神" in t_name or "genshin" in lower_title) else "📱 "
+            windows.append((hwnd, f"{prefix}{t_name} (PID: {pid.value})", 0))  # 優先度 0
+        else:
+            if len(t_name) >= 2 and "Genshin Lyre Player" not in t_name and "GenshinLyrePlayer" not in t_name:
+                windows.append((hwnd, f"🪟 {t_name} (PID: {pid.value})", 1))  # 優先度 1
             
         return True
 
     callback = WNDENUMPROC(enum_window_proc)
     ctypes.windll.user32.EnumWindows(callback, 0)
-    return windows
+    
+    # 按照優先度排序，讓原神和模擬器排在最上面！
+    windows.sort(key=lambda x: x[2])
+    
+    return [(w[0], w[1]) for w in windows]
+
+
+def get_input_target_hwnd(parent_hwnd: int) -> int:
+    """如果父視窗是常見模擬器，尋找其內部真正接收鍵盤事件的子視窗；否則直接返回父視窗。"""
+    if not parent_hwnd:
+        return 0
+        
+    class_name = ctypes.create_unicode_buffer(256)
+    ctypes.windll.user32.GetClassNameW(parent_hwnd, class_name, 256)
+    p_class = class_name.value
+    
+    # 儲存找到的子視窗
+    target_child = [parent_hwnd]
+    
+    WNDENUMPROC = ctypes.WINFUNCTYPE(ctypes.c_bool, ctypes.c_void_p, ctypes.c_void_p)
+    
+    def enum_child_proc(hwnd, lParam):
+        c_class = ctypes.create_unicode_buffer(256)
+        ctypes.windll.user32.GetClassNameW(hwnd, c_class, 256)
+        c_class_val = c_class.value
+        
+        # 常見模擬器接收輸入的子視窗類名：
+        # - 雷電模擬器: "RenderWindow"
+        # - 夜神模擬器: "ScreenWindow"
+        # - MuMu 模擬器: "SgRenderWindow" 或 "subWin"
+        if c_class_val in ("RenderWindow", "ScreenWindow", "SgRenderWindow", "subWin"):
+            target_child[0] = hwnd
+            return False  # 停止尋找
+        return True
+        
+    callback = WNDENUMPROC(enum_child_proc)
+    ctypes.windll.user32.EnumChildWindows(parent_hwnd, callback, 0)
+    return target_child[0]

@@ -1365,11 +1365,16 @@ class MainWindow(QWidget):
     def _on_target_hwnd_changed(self, index: int) -> None:
         """當選取的目標遊戲視窗改變時。"""
         hwnd = self._target_hwnd_combo.currentData()
-        self._player.set_target_hwnd(hwnd)
-        self._slave_executor.set_target_hwnd(hwnd)
         if hwnd:
-            print(f"[目標視窗] 已切換至特定視窗 (HWND: {hwnd})，啟用背景模擬模式")
+            # 獲取實際輸入視窗（若為模擬器會自動轉換為內部子視窗）
+            from core.key_simulator import get_input_target_hwnd
+            actual_hwnd = get_input_target_hwnd(hwnd)
+            self._player.set_target_hwnd(actual_hwnd)
+            self._slave_executor.set_target_hwnd(actual_hwnd)
+            print(f"[目標視窗] 已切換至特定視窗 (HWND: {hwnd} -> 實際輸入 HWND: {actual_hwnd})，啟用背景模擬模式")
         else:
+            self._player.set_target_hwnd(None)
+            self._slave_executor.set_target_hwnd(None)
             print("[目標視窗] 已切換至活動視窗，使用傳統前景 SendInput 模式")
 
     @pyqtSlot(int)
