@@ -17,10 +17,10 @@ if not TOKEN:
 
 OWNER = "CLZ0731"
 REPO = "genshin-lyre-player"
-TAG_NAME = "v1.12.0"
-MSI_FILE = r"dist\GenshinLyrePlayer-1.12.0-win64.msi"
+TAG_NAME = "v1.13.0"
+MSI_FILE = r"dist\GenshinLyrePlayer-1.13.0-win64.msi"
 PORTABLE_DIR = r"build\exe.win-amd64-3.12"
-ZIP_FILE = r"dist\GenshinLyrePlayer-1.12.0-portable.zip"
+ZIP_FILE = r"dist\GenshinLyrePlayer-1.13.0-portable.zip"
 
 def make_request(url, headers, method="GET", payload=None, data=None):
     if payload:
@@ -49,7 +49,7 @@ def create_release():
     payload = {
         "tag_name": TAG_NAME,
         "name": f"Genshin Lyre Player {TAG_NAME}",
-        "body": "## 更新內容\n- **新增單一程式「雙目標視窗」同步演奏功能（無延遲雙開聯彈）**：\n  - **主介面直接選取雙視窗**：現在不需要開啟兩個程式並用網路配對碼連線了！主介面直接新增「主控視窗」與「協同視窗」兩個下拉選單。\n  - **視覺化音域分配**：主控視窗與協同視窗右側皆新增「低/中/高」音域勾選框。您可以自由指定哪一區音軌在主控視窗（如 PC 原神）彈奏，哪一區音軌在協同視窗（如安卓模擬器）彈奏！\n  - **完美解決延遲與操作繁瑣問題**：完全消除了網路通訊帶來的任何微小延遲。同時只須執行一個軟體即可直接控制兩個遊戲客戶端，體驗極致流暢的二重奏！",
+        "body": "## 更新內容\n- **新增「自動/手動匯出文字檔鍵盤譜」功能**：\n  - **自動匯出**：於參數設定新增「自動匯出鍵盤譜」核取方塊。啟用後，當播放完畢時，程式會自動將該 MIDI 樂曲轉換為精心排版、可讀性極高的純文字鍵盤譜檔 (.txt) 並自動開啟。\n  - **一鍵手動匯出**：在音軌設定旁新增「匯出鍵盤譜」按鈕，讓您可以不用聽完整首歌，隨時一鍵直接轉換並在 exports 資料夾生成文字鍵盤譜。\n  - **高可讀性鍵盤譜排版**：單音與和弦（中括號 [] 包裹）分明，且依據音符延遲時間進行貼心的自動空格拉開與換行，完美符合玩家日常彈奏與練習習慣！",
         "draft": False,
         "prerelease": False
     }

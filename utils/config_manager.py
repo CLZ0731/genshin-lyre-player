@@ -18,6 +18,7 @@ DEFAULT_CONFIG = {
     "press_delay_max": 0.05,
     "transcribe_sensitivity": "medium",
     "track_preferences": {},
+    "auto_export_sheet": True,
 }
 
 
@@ -95,6 +96,15 @@ class ConfigManager:
     @transcribe_sensitivity.setter
     def transcribe_sensitivity(self, value: str) -> None:
         self._config["transcribe_sensitivity"] = value
+        self.save()
+
+    @property
+    def auto_export_sheet(self) -> bool:
+        return self._config.get("auto_export_sheet", DEFAULT_CONFIG["auto_export_sheet"])
+
+    @auto_export_sheet.setter
+    def auto_export_sheet(self, value: bool) -> None:
+        self._config["auto_export_sheet"] = value
         self.save()
 
     def get(self, key: str, default=None):

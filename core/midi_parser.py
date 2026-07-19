@@ -458,3 +458,60 @@ def scan_midi_folder(folder_path: str) -> list[str]:
             files.append(os.path.join(folder_path, name))
 
     return files
+
+
+def export_keyboard_sheet_text(parsed_midi) -> str:
+    """
+    將解析後的 Midi 轉化為易讀的鍵盤譜文字。
+    """
+    lines = []
+    lines.append(f"曲名: {parsed_midi.title}")
+    lines.append(f"原檔名: {parsed_midi.filename}")
+    lines.append(f"總音符數: {parsed_midi.total_notes}")
+    lines.append(f"BPM: {parsed_midi.bpm:.0f}")
+    lines.append("=" * 40)
+    lines.append("")
+    
+    current_line = []
+    
+    for event in parsed_midi.events:
+        if event.action != 'press' or not event.keys:
+            continue
+            
+        # 根據延遲時間決定換行或加空格
+        delay = event.time_seconds
+        if delay > 1.2:
+            # 延遲很大，直接新起一行，且加個空行
+            if current_line:
+                lines.append(" ".join(current_line))
+                current_line = []
+            lines.append("")  # 空行
+        elif delay > 0.6:
+            # 延遲較大，新起一行
+            if current_line:
+                lines.append(" ".join(current_line))
+                current_line = []
+        elif delay > 0.3:
+            # 延遲中等，加個大間隔
+            current_line.append(" ")
+            
+        # 處理單音與和弦 (去除重複按鍵)
+        seen = set()
+        keys = []
+        for k in event.keys:
+            k_up = k.upper()
+            if k_up not in seen:
+                seen.add(k_up)
+                keys.append(k_up)
+                
+        if len(keys) == 1:
+            current_line.append(keys[0])
+        elif len(keys) > 1:
+            # 和弦用中括號包起來，例如 [QAZ]
+            current_line.append(f"[{''.join(keys)}]")
+            
+    if current_line:
+        lines.append(" ".join(current_line))
+        
+    return "\n".join(lines).strip()
+

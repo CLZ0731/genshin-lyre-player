@@ -834,6 +834,12 @@ class MainWindow(QWidget):
         self._track_btn.clicked.connect(self._open_track_settings)
         info_row.addWidget(self._track_btn)
 
+        self._export_sheet_btn = QPushButton("匯出鍵盤譜")
+        self._export_sheet_btn.setObjectName("ControlBtn")
+        self._export_sheet_btn.setToolTip("將此曲轉換為易讀的鍵盤譜文字檔")
+        self._export_sheet_btn.clicked.connect(self._export_keyboard_sheet)
+        info_row.addWidget(self._export_sheet_btn)
+
         sep1 = QLabel("│")
         sep1.setObjectName("InfoSep")
         info_row.addWidget(sep1)
@@ -916,6 +922,12 @@ class MainWindow(QWidget):
         self._velocity_cb.setChecked(True)
         self._velocity_cb.stateChanged.connect(self._on_velocity_changed)
         params_row2.addWidget(self._velocity_cb)
+
+        self._auto_export_cb = QCheckBox("自動匯出鍵盤譜")
+        self._auto_export_cb.setToolTip("播放完畢後，自動將本曲匯出為文字檔鍵盤譜 (.txt) 並開啟")
+        self._auto_export_cb.setChecked(self._config.auto_export_sheet)
+        self._auto_export_cb.stateChanged.connect(self._on_auto_export_changed)
+        params_row2.addWidget(self._auto_export_cb)
 
         params_row2.addStretch()
         params_panel_layout.addLayout(params_row2)
@@ -1227,6 +1239,49 @@ class MainWindow(QWidget):
             except Exception as e:
                 self._note_display.setText("匯入失敗")
 
+    @pyqtSlot(int)
+    def _on_auto_export_changed(self, state: int) -> None:
+        """切換自動匯出狀態。"""
+        self._config.auto_export_sheet = (state == Qt.Checked)
+
+    @pyqtSlot()
+    def _export_keyboard_sheet(self) -> None:
+        """匯出當前歌曲的文字檔鍵盤譜。"""
+        if not self._current_midi:
+            self._status_label.setText("無可匯出的歌曲")
+            return
+
+        try:
+            # 建立 exports 目錄
+            import_dir = os.path.dirname(os.path.abspath(__file__))
+            export_dir = os.path.abspath(os.path.join(import_dir, "..", "exports"))
+            os.makedirs(export_dir, exist_ok=True)
+
+            # 去除檔名中不合法的字元
+            title = self._current_midi.title
+            for c in r'\/:*?"<>|':
+                title = title.replace(c, "_")
+
+            filepath = os.path.join(export_dir, f"{title}_鍵盤譜.txt")
+
+            # 生成鍵盤譜
+            from core.midi_parser import export_keyboard_sheet_text
+            sheet_content = export_keyboard_sheet_text(self._current_midi)
+
+            with open(filepath, "w", encoding="utf-8") as f:
+                f.write(sheet_content)
+
+            print(f"[鍵盤譜匯出] 已成功匯出至 {filepath}")
+
+            # 自動開啟檔案
+            if os.path.exists(filepath):
+                os.startfile(filepath)
+
+            self._status_label.setText("鍵盤譜已匯出並開啟")
+        except Exception as e:
+            print(f"[鍵盤譜匯出] 失敗: {e}")
+            self._status_label.setText("鍵盤譜匯出失敗")
+
     @pyqtSlot()
     def _delete_current_midi(self) -> None:
         """刪除當前選取的樂譜檔案。"""
@@ -1349,8 +1404,10 @@ class MainWindow(QWidget):
         self._speed_spin.setEnabled(enabled)
         self._dynamic_shift_cb.setEnabled(enabled)
         self._velocity_cb.setEnabled(enabled)
+        self._auto_export_cb.setEnabled(enabled)
         self._instrument_combo.setEnabled(enabled)
         self._track_btn.setEnabled(enabled)
+        self._export_sheet_btn.setEnabled(enabled)
         self._target_hwnd_combo.setEnabled(enabled)
         self._target_hwnd_combo2.setEnabled(enabled)
         self._refresh_windows_btn.setEnabled(enabled)
@@ -1626,6 +1683,8 @@ class MainWindow(QWidget):
             self._w2_low_cb.setEnabled(False)
             self._w2_mid_cb.setEnabled(False)
             self._w2_high_cb.setEnabled(False)
+            self._export_sheet_btn.setEnabled(False)
+            self._auto_export_cb.setEnabled(False)
         else:
             self._play_btn.setText("  播放")
             self._play_btn.setIcon(IconFactory.create_icon("play", QColor(255, 255, 255)))
@@ -1638,6 +1697,8 @@ class MainWindow(QWidget):
             self._w2_low_cb.setEnabled(True)
             self._w2_mid_cb.setEnabled(True)
             self._w2_high_cb.setEnabled(True)
+            self._export_sheet_btn.setEnabled(True)
+            self._auto_export_cb.setEnabled(True)
 
     @pyqtSlot(int, int)
     def _on_progress_updated(self, current: int, total: int) -> None:
@@ -1659,6 +1720,10 @@ class MainWindow(QWidget):
         self._play_btn.setIcon(IconFactory.create_icon("play", QColor(255, 255, 255)))
         self._status_label.setText("播放完畢")
         self._note_display.setText("✓")
+        
+        # 自動匯出鍵盤譜
+        if self._auto_export_cb.isChecked() and self._current_midi:
+            self._export_keyboard_sheet()
 
     @pyqtSlot(str)
     def _on_error(self, msg: str) -> None:
