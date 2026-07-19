@@ -71,15 +71,21 @@ class UpdateCheckerThread(QThread):
                     release_url = data.get("html_url", "")
                     release_notes = data.get("body", "")
                     
-                    # 尋找 ZIP 下載連結
+                    # 優先尋找增量更新檔 (patch.zip)，若無則尋找完整便攜版 (.zip)
                     download_url = ""
+                    patch_url = ""
                     for asset in data.get("assets", []):
-                        if asset.get("name", "").endswith(".zip"):
-                            download_url = asset.get("browser_download_url", "")
-                            break
+                        name = asset.get("name", "")
+                        if name.endswith("-patch.zip"):
+                            patch_url = asset.get("browser_download_url", "")
+                        elif name.endswith("-portable.zip") or name.endswith(".zip"):
+                            if not download_url:
+                                download_url = asset.get("browser_download_url", "")
+                    
+                    final_url = patch_url if patch_url else download_url
                     
                     if latest_version and self.is_newer(latest_version, self.current_version):
-                        self.update_available.emit(latest_version, release_url, release_notes, download_url)
+                        self.update_available.emit(latest_version, release_url, release_notes, final_url)
         except Exception as e:
             # 靜默處理網路或 API 連線異常
             print(f"[檢查更新] 檢查失敗或網路不可達: {e}")
@@ -660,6 +666,7 @@ class MainWindow(QWidget):
         self._resize_dir = None
         self._press_global_pos = QPoint()
         self._press_geometry = None
+        self._is_collapsed = False
 
         # ── 初始化元件 ──
         self._config = ConfigManager()
@@ -749,6 +756,13 @@ class MainWindow(QWidget):
         self._network_btn.setIcon(IconFactory.create_icon("network", QColor(94, 94, 94)))
         self._network_btn.clicked.connect(self._open_network_duet)
         title_layout.addWidget(self._network_btn)
+
+        self._collapse_btn = QPushButton()
+        self._collapse_btn.setObjectName("WinBtn")
+        self._collapse_btn.setToolTip("精簡模式")
+        self._collapse_btn.setIcon(IconFactory.create_icon("chevron-up", QColor(94, 94, 94)))
+        self._collapse_btn.clicked.connect(self._toggle_collapse)
+        title_layout.addWidget(self._collapse_btn)
 
         settings_btn = QPushButton()
         settings_btn.setObjectName("WinBtn")
@@ -864,9 +878,9 @@ class MainWindow(QWidget):
         # ════════════════════════════════════════════
         # 面板二：演奏參數 (Params Panel)
         # ════════════════════════════════════════════
-        params_panel = QFrame()
-        params_panel.setObjectName("ParamsPanel")
-        params_panel_layout = QVBoxLayout(params_panel)
+        self._params_panel = QFrame()
+        self._params_panel.setObjectName("ParamsPanel")
+        params_panel_layout = QVBoxLayout(self._params_panel)
         params_panel_layout.setContentsMargins(12, 8, 12, 10)
         params_panel_layout.setSpacing(8)
 
@@ -1019,7 +1033,7 @@ class MainWindow(QWidget):
         params_row4.addStretch()
         params_panel_layout.addLayout(params_row4)
 
-        main_layout.addWidget(params_panel)
+        main_layout.addWidget(self._params_panel)
 
         # ════════════════════════════════════════════
         # 面板三：播放控制 (Playback Panel)
@@ -1787,8 +1801,8 @@ class MainWindow(QWidget):
             if self._resize_dir:
                 delta = event.globalPos() - self._press_global_pos
                 rect = self.geometry()
-                min_w = 420
-                min_h = 500
+                min_w = self.minimumWidth()
+                min_h = self.minimumHeight()
                 
                 new_left = rect.left()
                 new_top = rect.top()
@@ -1843,6 +1857,22 @@ class MainWindow(QWidget):
         self._resize_dir = None
         self.setCursor(Qt.ArrowCursor)
         event.accept()
+
+    def _toggle_collapse(self) -> None:
+        """切換精簡模式 / 完整模式。"""
+        self._is_collapsed = not self._is_collapsed
+        if self._is_collapsed:
+            self._params_panel.hide()
+            self._collapse_btn.setToolTip("完整模式")
+            self._collapse_btn.setIcon(IconFactory.create_icon("chevron-down", QColor(94, 94, 94)))
+            self.setMinimumSize(440, 240)
+            self.resize(self.width(), 240)
+        else:
+            self._params_panel.show()
+            self._collapse_btn.setToolTip("精簡模式")
+            self._collapse_btn.setIcon(IconFactory.create_icon("chevron-up", QColor(94, 94, 94)))
+            self.setMinimumSize(440, 595)
+            self.resize(self.width(), 615)
 
     # ═══════════════════ 關閉處理 ═══════════════════
 

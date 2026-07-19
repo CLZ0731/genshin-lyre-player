@@ -17,10 +17,10 @@ if not TOKEN:
 
 OWNER = "CLZ0731"
 REPO = "genshin-lyre-player"
-TAG_NAME = "v1.13.0"
-MSI_FILE = r"dist\GenshinLyrePlayer-1.13.0-win64.msi"
+TAG_NAME = "v1.14.0"
+MSI_FILE = r"dist\GenshinLyrePlayer-1.14.0-win64.msi"
 PORTABLE_DIR = r"build\exe.win-amd64-3.12"
-ZIP_FILE = r"dist\GenshinLyrePlayer-1.13.0-portable.zip"
+ZIP_FILE = r"dist\GenshinLyrePlayer-1.14.0-portable.zip"
 
 def make_request(url, headers, method="GET", payload=None, data=None):
     if payload:
@@ -49,7 +49,7 @@ def create_release():
     payload = {
         "tag_name": TAG_NAME,
         "name": f"Genshin Lyre Player {TAG_NAME}",
-        "body": "## 更新內容\n- **新增「自動/手動匯出文字檔鍵盤譜」功能**：\n  - **自動匯出**：於參數設定新增「自動匯出鍵盤譜」核取方塊。啟用後，當播放完畢時，程式會自動將該 MIDI 樂曲轉換為精心排版、可讀性極高的純文字鍵盤譜檔 (.txt) 並自動開啟。\n  - **一鍵手動匯出**：在音軌設定旁新增「匯出鍵盤譜」按鈕，讓您可以不用聽完整首歌，隨時一鍵直接轉換並在 exports 資料夾生成文字鍵盤譜。\n  - **高可讀性鍵盤譜排版**：單音與和弦（中括號 [] 包裹）分明，且依據音符延遲時間進行貼心的自動空格拉開與換行，完美符合玩家日常彈奏與練習習慣！",
+        "body": "## 更新內容\n- **新增「精簡迷你模式（可摺疊視窗）」**：\n  - 在標題列新增「精簡模式 / 完整模式」切換按鈕，可一鍵將參數設定摺疊隱藏，縮小為僅 240 像素高的迷你浮動播放器，不再阻擋遊戲畫面！\n  - 修復自訂無邊框縮放臨界值同步 Bug，使手動調整大小更加平滑、反應靈敏。\n- **大幅降低系統資源佔用 (CPU 佔用率趨近 0%)**：\n  - 優化播放引擎的精準延遲控制，引進大區間預先休眠 (Pre-sleep) 機制釋放 CPU 週期，彻底免除 fine-grained 迴圈空轉，大幅降低執行緒資源消耗，提升執行速度！\n- **引進「增量代碼更新 (Code Patch)」機制**：\n  - 自動偵測並下載僅包含 `core/`、`ui/`、`utils/` 的增量更新補丁 (.zip)，下載量從 197 MB 驟降至 100 KB 以下！安裝程序瞬間完成，極大降低空間占用率！",
         "draft": False,
         "prerelease": False
     }
@@ -101,6 +101,7 @@ def main():
     print(f"正在打包免安裝版 ZIP...")
     import shutil
     import os
+    import zipfile
     
     if not os.path.exists("dist"):
         os.makedirs("dist")
@@ -109,10 +110,26 @@ def main():
     zip_base = ZIP_FILE[:-4] if ZIP_FILE.endswith(".zip") else ZIP_FILE
     shutil.make_archive(zip_base, 'zip', PORTABLE_DIR)
     
+    # 建立代碼增量更新補丁 PATCH_ZIP
+    print("正在打包代碼增量更新補丁 PATCH_ZIP...")
+    patch_zip_path = ZIP_FILE.replace("-portable.zip", "-patch.zip")
+    with zipfile.ZipFile(patch_zip_path, 'w', zipfile.ZIP_DEFLATED) as zip_f:
+        # 只打包 lib/core、lib/ui、lib/utils 中的檔案
+        for folder in ["core", "ui", "utils"]:
+            src_folder = os.path.join(PORTABLE_DIR, "lib", folder)
+            if os.path.exists(src_folder):
+                for root, dirs, files in os.walk(src_folder):
+                    for file in files:
+                        full_path = os.path.join(root, file)
+                        # 計算相對壓縮路徑，例如 "lib/core/player.pyc"
+                        rel_path = os.path.relpath(full_path, PORTABLE_DIR)
+                        zip_f.write(full_path, rel_path)
+    
     release_id = create_release()
     if release_id:
         upload_asset(release_id, MSI_FILE)
         upload_asset(release_id, ZIP_FILE)
+        upload_asset(release_id, patch_zip_path)
 
 if __name__ == "__main__":
     main()

@@ -178,7 +178,13 @@ class PlayerThread(QThread):
                 # ── 精準延遲等待 ──
                 if event.time_seconds > 0:
                     target_time = time.perf_counter() + event.time_seconds
-                    while time.perf_counter() < target_time - 0.002:
+                    
+                    # 1. 預先休眠：如果延遲時間較長，先進行一次大區間 sleep 釋放 CPU 資源
+                    if event.time_seconds > 0.015:
+                        time.sleep(event.time_seconds - 0.01)
+                        
+                    # 2. 微秒級細粒度休眠，避免過度喚醒
+                    while time.perf_counter() < target_time - 0.0015:
                         if self._is_stopped:
                             break
                         if not self._is_playing:
@@ -187,7 +193,9 @@ class PlayerThread(QThread):
                             remaining = target_time - time.perf_counter()
                             if remaining > 0:
                                 target_time = time.perf_counter() + remaining
-                        time.sleep(0.001)
+                        time.sleep(0.0005)
+                        
+                    # 3. 極短時間 busy wait 保證高精準度，完全無延遲
                     while time.perf_counter() < target_time:
                         pass
 

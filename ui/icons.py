@@ -194,11 +194,30 @@ class IconFactory:
             # 右下點
             painter.drawEllipse(QRectF(size * 0.68, size * 0.68, 6, 6))
             
-            # 連接線
             painter.setBrush(Qt.NoBrush)
             painter.drawLine(int(size/2), int(size * 0.22 + 6), int(size * 0.22 + 3), int(size * 0.68))
             painter.drawLine(int(size/2), int(size * 0.22 + 6), int(size * 0.68 + 3), int(size * 0.68))
             painter.drawLine(int(size * 0.22 + 6), int(size * 0.68 + 3), int(size * 0.68), int(size * 0.68 + 3))
+
+        elif icon_type == "chevron-up":
+            # 展開/收起 向上箭頭 (V型)
+            margin = size * 0.3
+            painter.setBrush(Qt.NoBrush)
+            path = QPainterPath()
+            path.moveTo(margin, size - margin)
+            path.lineTo(size/2, margin + 2)
+            path.lineTo(size - margin, size - margin)
+            painter.drawPath(path)
+
+        elif icon_type == "chevron-down":
+            # 展開/收起 向下箭頭 (V型)
+            margin = size * 0.3
+            painter.setBrush(Qt.NoBrush)
+            path = QPainterPath()
+            path.moveTo(margin, margin + 2)
+            path.lineTo(size/2, size - margin)
+            path.lineTo(size - margin, margin + 2)
+            painter.drawPath(path)
             
         painter.end()
         
