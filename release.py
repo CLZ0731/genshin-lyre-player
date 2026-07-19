@@ -17,10 +17,10 @@ if not TOKEN:
 
 OWNER = "CLZ0731"
 REPO = "genshin-lyre-player"
-TAG_NAME = "v1.14.0"
-MSI_FILE = r"dist\GenshinLyrePlayer-1.14.0-win64.msi"
+TAG_NAME = "v1.14.1"
+MSI_FILE = r"dist\GenshinLyrePlayer-1.14.1-win64.msi"
 PORTABLE_DIR = r"build\exe.win-amd64-3.12"
-ZIP_FILE = r"dist\GenshinLyrePlayer-1.14.0-portable.zip"
+ZIP_FILE = r"dist\GenshinLyrePlayer-1.14.1-portable.zip"
 
 def make_request(url, headers, method="GET", payload=None, data=None):
     if payload:
@@ -49,7 +49,7 @@ def create_release():
     payload = {
         "tag_name": TAG_NAME,
         "name": f"Genshin Lyre Player {TAG_NAME}",
-        "body": "## 更新內容\n- **新增「精簡迷你模式（可摺疊視窗）」**：\n  - 在標題列新增「精簡模式 / 完整模式」切換按鈕，可一鍵將參數設定摺疊隱藏，縮小為僅 240 像素高的迷你浮動播放器，不再阻擋遊戲畫面！\n  - 修復自訂無邊框縮放臨界值同步 Bug，使手動調整大小更加平滑、反應靈敏。\n- **大幅降低系統資源佔用 (CPU 佔用率趨近 0%)**：\n  - 優化播放引擎的精準延遲控制，引進大區間預先休眠 (Pre-sleep) 機制釋放 CPU 週期，彻底免除 fine-grained 迴圈空轉，大幅降低執行緒資源消耗，提升執行速度！\n- **引進「增量代碼更新 (Code Patch)」機制**：\n  - 自動偵測並下載僅包含 `core/`、`ui/`、`utils/` 的增量更新補丁 (.zip)，下載量從 197 MB 驟降至 100 KB 以下！安裝程序瞬間完成，極大降低空間占用率！",
+        "body": "## 更新內容\n- **修復精簡迷你模式摺疊時 UI 重疊問題**：\n  - 引進 Qt 動態排版高度計算，折疊時根據當前可見元件動態計算最小安全高度，徹底解決不同 DPI 縮放下的 UI 重疊與擠壓問題！\n- **精簡迷你模式（可摺疊視窗）**：\n  - 在標題列新增「精簡模式 / 完整模式」切換按鈕，可一鍵將參數設定摺疊隱藏，縮小為迷你浮動播放器，不再阻擋遊戲畫面！\n- **大幅降低系統資源佔用 (CPU 佔用率趨近 0%)**：\n  - 優化播放引擎的精準延遲控制，引進大區間預先休眠 (Pre-sleep) 機制釋放 CPU 週期，降低執行緒資源消耗，提升執行速度！\n- **引進「增量代碼更新 (Code Patch)」機制**：\n  - 自動偵測並下載僅包含 `core/`、`ui/`、`utils/` 的增量更新補丁 (.zip)，下載量從 197 MB 降至 100 KB 以下！安裝程序瞬間完成，降低空間占用率！",
         "draft": False,
         "prerelease": False
     }

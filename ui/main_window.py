@@ -1865,14 +1865,20 @@ class MainWindow(QWidget):
             self._params_panel.hide()
             self._collapse_btn.setToolTip("完整模式")
             self._collapse_btn.setIcon(IconFactory.create_icon("chevron-down", QColor(94, 94, 94)))
-            self.setMinimumSize(440, 240)
-            self.resize(self.width(), 240)
+            self.setMinimumSize(440, 0)
+            self.layout().activate()
+            min_h = self.layout().minimumSize().height()
+            self.setMinimumSize(440, min_h)
+            self.resize(self.width(), min_h)
         else:
             self._params_panel.show()
             self._collapse_btn.setToolTip("精簡模式")
             self._collapse_btn.setIcon(IconFactory.create_icon("chevron-up", QColor(94, 94, 94)))
-            self.setMinimumSize(440, 595)
-            self.resize(self.width(), 615)
+            self.setMinimumSize(440, 0)
+            self.layout().activate()
+            min_h = self.layout().minimumSize().height()
+            self.setMinimumSize(440, min_h)
+            self.resize(self.width(), min_h)
 
     # ═══════════════════ 關閉處理 ═══════════════════
 
