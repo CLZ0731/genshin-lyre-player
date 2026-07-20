@@ -11,6 +11,15 @@ import os
 from dataclasses import dataclass, field
 
 import mido
+# 解決部分非標準 MIDI 包含損毀的 key_signature 元數據（例如超限的升降音記號）導致 mido.KeySignatureError 崩潰的問題
+try:
+    import mido.midifiles.meta as meta
+    if 0x59 in meta._META_SPECS:
+        del meta._META_SPECS[0x59]
+    if 'key_signature' in meta._META_SPEC_BY_TYPE:
+        del meta._META_SPEC_BY_TYPE['key_signature']
+except Exception:
+    pass
 
 
 # ─────────────────────────── GM 樂器分類 ───────────────────────────
