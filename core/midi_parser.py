@@ -153,6 +153,8 @@ def analyze_best_pitch_shift(filepath: str, enabled_tracks: list[int] | None = N
     快速掃描 MIDI 檔案，回傳全曲最佳的基礎平移半音數（黑鍵最少）。
     不會完整轉換為事件序列。
     """
+    if filepath.lower().endswith('.txt'):
+        return 0
     try:
         midi_file = mido.MidiFile(filepath)
     except Exception:
@@ -202,6 +204,9 @@ def parse_midi(
     將它們合併到同一時間軸，並轉換為按鍵序列。
     如果提供了 enabled_tracks，則只載入該清單中的音軌編號 (0-indexed)。
     """
+    if filepath.lower().endswith('.txt'):
+        return parse_txt_sheet(filepath, speed_multiplier)
+
     midi_file = mido.MidiFile(filepath)
     ticks_per_beat = midi_file.ticks_per_beat
 
@@ -453,12 +458,162 @@ def parse_midi(
     )
 
 
+def parse_txt_sheet(filepath: str, speed_multiplier: float = 1.0) -> ParsedMidi:
+    """
+    解析 .txt 格式的文字鍵盤譜，並生成與 parse_midi 同樣結構的 ParsedMidi 對象。
+    """
+    import re
+    
+    filename = os.path.basename(filepath)
+    title = os.path.splitext(filename)[0]
+    
+    # 預設 BPM
+    bpm = 120.0
+    
+    try:
+        with open(filepath, "r", encoding="utf-8") as f:
+            content = f.read()
+    except Exception:
+        # 備用編碼
+        try:
+            with open(filepath, "r", encoding="gbk", errors="ignore") as f:
+                content = f.read()
+        except Exception:
+            content = ""
+            
+    # 偵測 BPM
+    bpm_match = re.search(r"(?i)bpm\s*[:=]\s*(\d+(\.\d+)?)", content)
+    if bpm_match:
+        bpm = float(bpm_match.group(1))
+        
+    # 計算時間間隔
+    tick_duration = (30.0 / bpm) / speed_multiplier
+    release_duration = min(0.15, tick_duration * 0.7)
+    
+    lines = content.splitlines()
+    current_time = 0.0
+    abs_events = []
+    
+    for line in lines:
+        line_str = line.strip()
+        if not line_str:
+            continue
+            
+        # 1. 排除包含中文字的行（中文歌詞、注釋等）
+        if any(ord(c) >= 0x4e00 and ord(c) <= 0x9fff for c in line_str):
+            continue
+            
+        # 2. 判斷是否為音符行
+        letters = [c for c in line_str if c.isalpha()]
+        if not letters:
+            continue
+            
+        uppercase_valid = [c for c in letters if c.isupper() and c in "QWERTYUASDFGHJZXCVBNM"]
+        ratio = len(uppercase_valid) / len(letters)
+        if ratio <= 0.8:
+            continue
+            
+        # 3. Tokenize 行
+        tokens = []
+        i = 0
+        while i < len(line_str):
+            c = line_str[i]
+            if c == ' ':
+                tokens.append(('space', 1))
+                i += 1
+            elif c == '/':
+                tokens.append(('slash', 1))
+                i += 1
+            elif c in ('[', '('):
+                end_char = ']' if c == '[' else ')'
+                j = line_str.find(end_char, i)
+                if j != -1:
+                    chord_content = line_str[i+1:j]
+                    keys = [k for k in chord_content.upper() if k in "QWERTYUASDFGHJZXCVBNM"]
+                    if keys:
+                        tokens.append(('chord', keys))
+                    i = j + 1
+                else:
+                    i += 1
+            elif c.upper() in "QWERTYUASDFGHJZXCVBNM":
+                tokens.append(('note', c.upper()))
+                i += 1
+            else:
+                i += 1
+                
+        # 4. 生成絕對時間事件
+        for token_type, value in tokens:
+            if token_type == 'space':
+                current_time += tick_duration
+            elif token_type == 'slash':
+                current_time += 2 * tick_duration
+            elif token_type == 'note':
+                abs_events.append((current_time, 'press', [value]))
+                abs_events.append((current_time + release_duration, 'release', [value]))
+                current_time += 0.01
+            elif token_type == 'chord':
+                abs_events.append((current_time, 'press', value))
+                abs_events.append((current_time + release_duration, 'release', value))
+                current_time += 0.01
+                
+        # 換行延遲以區分樂句
+        if tokens and tokens[-1][0] not in ('space', 'slash'):
+            current_time += tick_duration
+        else:
+            current_time += tick_duration
+
+    # 按絕對時間與動作排序（release 先行）
+    abs_events.sort(key=lambda e: (e[0], 0 if e[1] == 'release' else 1))
+    
+    # 轉換成 delta time 的 KeyEvent
+    events = []
+    last_time = 0.0
+    total_notes = 0
+    
+    for abs_time, action, keys in abs_events:
+        delta = abs_time - last_time
+        last_time = abs_time
+        
+        events.append(KeyEvent(
+            time_seconds=delta,
+            action=action,
+            keys=keys,
+            midi_notes=[],
+            velocity=100
+        ))
+        
+        if action == 'press':
+            total_notes += len(keys)
+            
+    # 模擬一個音軌資訊以供 UI 使用
+    tracks_info = [MidiTrackInfo(
+        index=0,
+        name="Text Sheet Track",
+        note_count=total_notes,
+        instrument="Keyboard Sheet",
+        gm_program=0,
+        suitability=100
+    )]
+    
+    duration = last_time if last_time > 0 else 0.0
+    
+    return ParsedMidi(
+        filename=filename,
+        title=title,
+        bpm=bpm * speed_multiplier,
+        total_notes=total_notes,
+        duration_seconds=duration,
+        events=events,
+        tracks_info=tracks_info
+    )
+
+
 def scan_midi_folder(folder_path: str) -> list[str]:
     if not os.path.isdir(folder_path):
         os.makedirs(folder_path, exist_ok=True)
         return []
 
-    midi_extensions = {'.mid', '.midi'}
+    midi_extensions = {'.mid', '.midi', '.txt'}
     files = []
 
     for name in sorted(os.listdir(folder_path)):

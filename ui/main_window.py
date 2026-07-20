@@ -1183,10 +1183,10 @@ class MainWindow(QWidget):
                 f"共 {len(self._midi_files)} 首"
             )
         else:
-            self._track_combo.addItem("❌ 未找到 MIDI 檔案")
+            self._track_combo.addItem("❌ 未找到樂譜檔案")
             self._bpm_label.setText("BPM: --")
             self._status_label.setText(
-                f"請匯入 .mid 檔案"
+                f"請匯入 .mid 或 .txt 檔案"
             )
             self._current_midi = None
             
@@ -1233,9 +1233,9 @@ class MainWindow(QWidget):
 
     @pyqtSlot()
     def _import_midi(self) -> None:
-        """匯入外部 MIDI 檔案。"""
+        """匯入外部樂譜檔案。"""
         file_path, _ = QFileDialog.getOpenFileName(
-            self, "選擇 MIDI 檔案", "", "MIDI 檔案 (*.mid *.midi)"
+            self, "選擇樂譜檔案", "", "樂譜檔案 (*.mid *.midi *.txt)"
         )
         if file_path:
             try:

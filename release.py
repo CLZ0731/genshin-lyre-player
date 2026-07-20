@@ -17,10 +17,10 @@ if not TOKEN:
 
 OWNER = "CLZ0731"
 REPO = "genshin-lyre-player"
-TAG_NAME = "v1.14.2"
-MSI_FILE = r"dist\GenshinLyrePlayer-1.14.2-win64.msi"
+TAG_NAME = "v1.15.0"
+MSI_FILE = r"dist\GenshinLyrePlayer-1.15.0-win64.msi"
 PORTABLE_DIR = r"build\exe.win-amd64-3.12"
-ZIP_FILE = r"dist\GenshinLyrePlayer-1.14.2-portable.zip"
+ZIP_FILE = r"dist\GenshinLyrePlayer-1.15.0-portable.zip"
 
 def make_request(url, headers, method="GET", payload=None, data=None):
     if payload:
@@ -49,7 +49,7 @@ def create_release():
     payload = {
         "tag_name": TAG_NAME,
         "name": f"Genshin Lyre Player {TAG_NAME}",
-        "body": "## 更新內容\n- **修復部分非標準 MIDI 導致解析失敗與崩潰的 Bug**：\n  - 針對部分包含非標準、損毀或超限的 key_signature 詮釋資料 (Meta Message) 的 MIDI 檔案，Mido 解析庫會拋出未處理的 KeySignatureError 導致程式載入失敗。\n  - 本次更新在解析引擎中對 Mido 的解碼配置進行了安全防護，在載入時自動忽略/旁路 key_signature 詮釋資料，全面解決不正常 MIDI 檔解析失敗的問題！",
+        "body": "## 更新內容\n- **新增純文字鍵盤譜播放支援 (.txt)**：\n  - 原生支援播放傳統網路鍵盤譜（如蒲公英的約定格式）與本程式匯出的鍵盤譜！\n  - 引進智慧文本過濾系統，自動識別排除歌詞、歌名、段落注釋（如：前奏、副歌等），僅保留有效琴鍵代碼。\n  - 支援括號 `[...]` 或 `(...)` 和弦多鍵同步按下。\n  - 支援以空格、斜線 `/` 作為節奏間隔進行精確的延遲計算，並支援以 `BPM: 數字` 自動調整播放速度！",
         "draft": False,
         "prerelease": False
     }
