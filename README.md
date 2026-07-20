@@ -1,4 +1,4 @@
-# 🎹 溱媽媽原神風物之詩琴 — 智慧自動彈琴 
+# 🎹 溱媽媽原神風物之詩琴 — 智慧彈琴 
 
 [![Platform](https://img.shields.io/badge/platform-Windows-blue.svg)](https://www.microsoft.com/windows)
 [![Python](https://img.shields.io/badge/python-3.12-blue.svg)](https://www.python.org/)
