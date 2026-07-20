@@ -487,8 +487,8 @@ def parse_txt_sheet(filepath: str, speed_multiplier: float = 1.0) -> ParsedMidi:
     if bpm_match:
         bpm = float(bpm_match.group(1))
         
-    # 計算時間間隔：使用緊湊流暢的 24.0/bpm 作為基準
-    tick_duration = (24.0 / bpm) / speed_multiplier
+    # 計算時間間隔：回歸標準且適中的 30.0/bpm 作為基準
+    tick_duration = (30.0 / bpm) / speed_multiplier
     release_duration = min(0.12, tick_duration * 0.7)
     
     lines = content.splitlines()
@@ -575,21 +575,16 @@ def parse_txt_sheet(filepath: str, speed_multiplier: float = 1.0) -> ParsedMidi:
             # 獲取兩個音符之間的間隔字串
             mid_str = content[end_pos:next_start]
             
-            # 去除斜線 (Bar lines)，它們不應該增加延遲
-            mid_str_no_slash = mid_str.replace('/', '')
+            # 統計空格數與換行數
+            space_count = mid_str.count(' ')
+            newline_count = min(1, mid_str.count('\n'))
             
-            if '\n' in mid_str_no_slash:
-                # 換行代表樂句過渡，給予極短平滑間隔 1.5 * tick_duration
-                delay = 1.5 * tick_duration
-            elif ' ' in mid_str_no_slash:
-                space_count = mid_str_no_slash.count(' ')
-                if space_count >= 3:
-                    delay = 2 * tick_duration
-                else:
-                    delay = 1 * tick_duration
-            else:
-                # 連寫或僅有斜線分隔，視為極快速連續音
+            if space_count == 0 and newline_count == 0:
                 delay = 0.03
+            else:
+                # 每個空格增加 1 * tick_duration
+                # 每個換行增加 1 * tick_duration
+                delay = max(tick_duration, space_count * tick_duration) + (newline_count * tick_duration)
                 
             current_time += delay
 
