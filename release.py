@@ -17,10 +17,10 @@ if not TOKEN:
 
 OWNER = "CLZ0731"
 REPO = "genshin-lyre-player"
-TAG_NAME = "v1.15.0"
-MSI_FILE = r"dist\GenshinLyrePlayer-1.15.0-win64.msi"
+TAG_NAME = "v1.15.1"
+MSI_FILE = r"dist\GenshinLyrePlayer-1.15.1-win64.msi"
 PORTABLE_DIR = r"build\exe.win-amd64-3.12"
-ZIP_FILE = r"dist\GenshinLyrePlayer-1.15.0-portable.zip"
+ZIP_FILE = r"dist\GenshinLyrePlayer-1.15.1-portable.zip"
 
 def make_request(url, headers, method="GET", payload=None, data=None):
     if payload:
@@ -49,7 +49,7 @@ def create_release():
     payload = {
         "tag_name": TAG_NAME,
         "name": f"Genshin Lyre Player {TAG_NAME}",
-        "body": "## 更新內容\n- **新增純文字鍵盤譜播放支援 (.txt)**：\n  - 原生支援播放傳統網路鍵盤譜（如蒲公英的約定格式）與本程式匯出的鍵盤譜！\n  - 引進智慧文本過濾系統，自動識別排除歌詞、歌名、段落注釋（如：前奏、副歌等），僅保留有效琴鍵代碼。\n  - 支援括號 `[...]` 或 `(...)` 和弦多鍵同步按下。\n  - 支援以空格、斜線 `/` 作為節奏間隔進行精確的延遲計算，並支援以 `BPM: 數字` 自動調整播放速度！",
+        "body": "## 更新內容\n- **優化文字鍵盤譜播放的流暢度與停頓間隔**：\n  - 重新設計了時間間隔算法，改為基於音符間隔子字串 (Substring-based) 的智慧延遲判定，避免空格與斜線 `/` 被重複疊加計時。\n  - 調緊基礎時間間隔基準，使音符過渡極致平滑流暢，完美還原真實彈奏體驗！",
         "draft": False,
         "prerelease": False
     }

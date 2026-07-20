@@ -461,6 +461,7 @@ def parse_midi(
 def parse_txt_sheet(filepath: str, speed_multiplier: float = 1.0) -> ParsedMidi:
     """
     解析 .txt 格式的文字鍵盤譜，並生成與 parse_midi 同樣結構的 ParsedMidi 對象。
+    使用基於音符間隔子字串分析的智慧間隔算法，杜絕空格與斜線重複累加導致的不流暢感。
     """
     import re
     
@@ -486,86 +487,113 @@ def parse_txt_sheet(filepath: str, speed_multiplier: float = 1.0) -> ParsedMidi:
     if bpm_match:
         bpm = float(bpm_match.group(1))
         
-    # 計算時間間隔
-    tick_duration = (30.0 / bpm) / speed_multiplier
-    release_duration = min(0.15, tick_duration * 0.7)
+    # 計算時間間隔：使用緊湊流暢的 24.0/bpm 作為基準
+    tick_duration = (24.0 / bpm) / speed_multiplier
+    release_duration = min(0.12, tick_duration * 0.7)
     
     lines = content.splitlines()
-    current_time = 0.0
-    abs_events = []
     
+    # 1. 提取所有有效的音符/和弦標記，並記錄它們在整個文本中的絕對位置
+    # 格式: (char_start_pos, char_end_pos, note_type, keys_list)
+    note_tokens = []
+    
+    current_char_offset = 0
     for line in lines:
         line_str = line.strip()
+        line_len = len(line) + 1 # +1 for newline character
+        
         if not line_str:
+            current_char_offset += line_len
             continue
             
-        # 1. 排除包含中文字的行（中文歌詞、注釋等）
+        # 排除包含中文字的行（歌詞、注釋等）
         if any(ord(c) >= 0x4e00 and ord(c) <= 0x9fff for c in line_str):
+            current_char_offset += line_len
             continue
             
-        # 2. 判斷是否為音符行
+        # 判斷是否為音符行
         letters = [c for c in line_str if c.isalpha()]
         if not letters:
+            current_char_offset += line_len
             continue
             
         uppercase_valid = [c for c in letters if c.isupper() and c in "QWERTYUASDFGHJZXCVBNM"]
         ratio = len(uppercase_valid) / len(letters)
         if ratio <= 0.8:
+            current_char_offset += line_len
             continue
             
-        # 3. Tokenize 行
-        tokens = []
+        # 在此音符行內尋找所有的單音與和弦
         i = 0
         while i < len(line_str):
             c = line_str[i]
-            if c == ' ':
-                tokens.append(('space', 1))
-                i += 1
-            elif c == '/':
-                tokens.append(('slash', 1))
-                i += 1
-            elif c in ('[', '('):
+            if c in ('[', '('):
                 end_char = ']' if c == '[' else ')'
                 j = line_str.find(end_char, i)
                 if j != -1:
                     chord_content = line_str[i+1:j]
                     keys = [k for k in chord_content.upper() if k in "QWERTYUASDFGHJZXCVBNM"]
                     if keys:
-                        tokens.append(('chord', keys))
+                        note_tokens.append((
+                            current_char_offset + i,
+                            current_char_offset + j + 1,
+                            'chord',
+                            keys
+                        ))
                     i = j + 1
                 else:
                     i += 1
             elif c.upper() in "QWERTYUASDFGHJZXCVBNM":
-                tokens.append(('note', c.upper()))
+                note_tokens.append((
+                    current_char_offset + i,
+                    current_char_offset + i + 1,
+                    'note',
+                    [c.upper()]
+                ))
                 i += 1
             else:
                 i += 1
                 
-        # 4. 生成絕對時間事件
-        for token_type, value in tokens:
-            if token_type == 'space':
-                current_time += tick_duration
-            elif token_type == 'slash':
-                current_time += 2 * tick_duration
-            elif token_type == 'note':
-                abs_events.append((current_time, 'press', [value]))
-                abs_events.append((current_time + release_duration, 'release', [value]))
-                current_time += 0.01
-            elif token_type == 'chord':
-                abs_events.append((current_time, 'press', value))
-                abs_events.append((current_time + release_duration, 'release', value))
-                current_time += 0.01
-                
-        # 換行延遲以區分樂句
-        if tokens and tokens[-1][0] not in ('space', 'slash'):
-            current_time += tick_duration
-        else:
-            current_time += tick_duration
+        current_char_offset += line_len
 
-    # 按絕對時間與動作排序（release 先行）
+    # 2. 計算音符之間的間隔，生成絕對時間事件
+    abs_events = []
+    current_time = 0.0
+    
+    for idx, token in enumerate(note_tokens):
+        start_pos, end_pos, ttype, keys = token
+        
+        # 寫入 press/release 事件
+        abs_events.append((current_time, 'press', keys))
+        abs_events.append((current_time + release_duration, 'release', keys))
+        
+        # 計算到下一個音符的延遲
+        if idx < len(note_tokens) - 1:
+            next_token = note_tokens[idx + 1]
+            next_start = next_token[0]
+            
+            # 獲取兩個音符之間的間隔字串
+            mid_str = content[end_pos:next_start]
+            
+            # 智慧計算延遲時間，杜絕重複加總
+            if '/' in mid_str:
+                delay = 2 * tick_duration
+            elif ' ' in mid_str:
+                space_count = mid_str.count(' ')
+                if space_count >= 3:
+                    delay = 2 * tick_duration
+                else:
+                    delay = 1 * tick_duration
+            else:
+                # 連寫琴鍵（例如 QWE），視為極快速連續演奏（琶音/滑音風格）
+                delay = 0.03
+                
+            current_time += delay
+
+    # 3. 按絕對時間與動作排序（release 先行）
     abs_events.sort(key=lambda e: (e[0], 0 if e[1] == 'release' else 1))
     
-    # 轉換成 delta time 的 KeyEvent
+    # 4. 轉換成 delta time 的 KeyEvent
     events = []
     last_time = 0.0
     total_notes = 0
