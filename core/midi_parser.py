@@ -575,17 +575,20 @@ def parse_txt_sheet(filepath: str, speed_multiplier: float = 1.0) -> ParsedMidi:
             # 獲取兩個音符之間的間隔字串
             mid_str = content[end_pos:next_start]
             
-            # 智慧計算延遲時間，杜絕重複加總
-            if '/' in mid_str:
-                delay = 2 * tick_duration
-            elif ' ' in mid_str:
-                space_count = mid_str.count(' ')
+            # 去除斜線 (Bar lines)，它們不應該增加延遲
+            mid_str_no_slash = mid_str.replace('/', '')
+            
+            if '\n' in mid_str_no_slash:
+                # 換行代表樂句過渡，給予極短平滑間隔 1.5 * tick_duration
+                delay = 1.5 * tick_duration
+            elif ' ' in mid_str_no_slash:
+                space_count = mid_str_no_slash.count(' ')
                 if space_count >= 3:
                     delay = 2 * tick_duration
                 else:
                     delay = 1 * tick_duration
             else:
-                # 連寫琴鍵（例如 QWE），視為極快速連續演奏（琶音/滑音風格）
+                # 連寫或僅有斜線分隔，視為極快速連續音
                 delay = 0.03
                 
             current_time += delay

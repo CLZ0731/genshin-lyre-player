@@ -17,10 +17,10 @@ if not TOKEN:
 
 OWNER = "CLZ0731"
 REPO = "genshin-lyre-player"
-TAG_NAME = "v1.15.1"
-MSI_FILE = r"dist\GenshinLyrePlayer-1.15.1-win64.msi"
+TAG_NAME = "v1.15.2"
+MSI_FILE = r"dist\GenshinLyrePlayer-1.15.2-win64.msi"
 PORTABLE_DIR = r"build\exe.win-amd64-3.12"
-ZIP_FILE = r"dist\GenshinLyrePlayer-1.15.1-portable.zip"
+ZIP_FILE = r"dist\GenshinLyrePlayer-1.15.2-portable.zip"
 
 def make_request(url, headers, method="GET", payload=None, data=None):
     if payload:
@@ -49,7 +49,7 @@ def create_release():
     payload = {
         "tag_name": TAG_NAME,
         "name": f"Genshin Lyre Player {TAG_NAME}",
-        "body": "## 更新內容\n- **優化文字鍵盤譜播放的流暢度與停頓間隔**：\n  - 重新設計了時間間隔算法，改為基於音符間隔子字串 (Substring-based) 的智慧延遲判定，避免空格與斜線 `/` 被重複疊加計時。\n  - 調緊基礎時間間隔基準，使音符過渡極致平滑流暢，完美還原真實彈奏體驗！",
+        "body": "## 更新內容\n- **徹底修復文字譜中斜線 `/` (小節線) 導致生硬停頓的 Bug**：\n  - 在網路鍵盤譜中，斜線 `/` 本質上是「小節線（Bar Line）」，僅用於視覺排版區分節拍，不應產生時間上的額外停頓。\n  - 此次更新將斜線視為零延遲的純排版字元，並優化了換行樂句的平滑間隔，完美實現旋律的一氣呵成！",
         "draft": False,
         "prerelease": False
     }
